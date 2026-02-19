@@ -1,2 +1,4 @@
 # HeterogeneousArrays.jl
-This repository implements a type named HeterogeneousVector which is a segmented array type which can hold components of different concrete type while still supporting efficient type-stable broadcasting.
+This repository introduces a type called HeterogeneousVector, a segmented array designed to hold elements of different concrete types while maintaining efficient, type-stable broadcasting.
+
+The goal of this project is to generalize the prototype from [COMBAT.jl](https://github.com/yaccos/COMBAT.jl) into a more versatile and reusable package.

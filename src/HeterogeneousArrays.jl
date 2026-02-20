@@ -4,6 +4,12 @@ export HeterogeneousVector
 
 using Unitful: Unitful
 using RecursiveArrayTools: RecursiveArrayTools
+import Base: NamedTuple
+
+
+
+
+
 
 # Copy-catted from DiffEqBase DiffEqBaseUnitfulExt.jl
 Value(x::Number) = x

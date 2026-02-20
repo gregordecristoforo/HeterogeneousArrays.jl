@@ -12,8 +12,8 @@ jobs:
       - name: Install JuliaFormatter
         # Using a one-liner to avoid adding it to Project.toml if you prefer
         run: julia -e 'using Pkg; Pkg.add("JuliaFormatter")'
-      - uses: julia-actions/julia-format@v1
-        # this lets GitHub automatically fix the formatting and commit it back to the branch
+      - uses: julia-actions/julia-format@v4
         with:
+        # this lets GitHub automatically fix the formatting and commit it back to the branch
           annotate: true
 

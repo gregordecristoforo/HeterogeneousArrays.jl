@@ -1,0 +1,8 @@
+[deps]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+
+[extras]
+HeterogeneousArrays = "40d36c5c-e028-4551-8108-c37812a952b9"
+
+[targets]
+docs = ["HeterogeneousArrays"] 

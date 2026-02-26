@@ -15,3 +15,10 @@ makedocs(
     ],
     checkdocs = :exports                  # Only check exported symbols
 )
+
+# Deploy documentation to GitHub Pages
+deploydocs(
+    repo = "github.com/jullcifer/HeterogeneousArrays.jl.git",
+    devbranch = "main",
+    push_preview = false
+)

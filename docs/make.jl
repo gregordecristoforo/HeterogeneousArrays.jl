@@ -1,8 +1,4 @@
 using Documenter
-
-# Add the parent project to the load path
-push!(LOAD_PATH, joinpath(@__DIR__, ".."))
-
 using HeterogeneousArrays
 
 makedocs(
@@ -16,9 +12,10 @@ makedocs(
     checkdocs = :exports                  # Only check exported symbols
 )
 
-# Deploy documentation to GitHub Pages
-deploydocs(
-    repo = "github.com/jullcifer/HeterogeneousArrays.jl.git",
-    devbranch = "main",
-    push_preview = false
-)
+# Deploy documentation to GitHub Pages (only in CI/CD)
+if get(ENV, "CI", nothing) == "true"
+    deploydocs(
+        devbranch = "main",
+        push_preview = false
+    )
+end

@@ -1,10 +1,12 @@
 module HeterogeneousArrays
 
-export HeterogeneousVector
+export AbstractHeterogeneousVector, HeterogeneousVector
 
 using Unitful: Unitful
 using RecursiveArrayTools: RecursiveArrayTools
 import Base: NamedTuple
+
+abstract type AbstractHeterogeneousVector{T, S} <: AbstractVector{T} end
 
 # Copy-catted from DiffEqBase DiffEqBaseUnitfulExt.jl
 Value(x::Number) = x
@@ -26,7 +28,7 @@ _set_value!(x::Ref, val) = (x[] = val)
 _set_value!(x::AbstractArray, val::AbstractArray) = copy!(x, val)
 _set_value!(x::AbstractArray, val, idx) = (x[idx] = val)
 
-struct HeterogeneousVector{T, S <: NamedTuple} <: AbstractVector{T}
+struct HeterogeneousVector{T, S <: NamedTuple} <: AbstractHeterogeneousVector{T, S}
     x::S
     function HeterogeneousVector(x::NamedTuple)
         # Wrap scalar fields in Ref for mutability
@@ -53,39 +55,96 @@ struct HeterogeneousVector{T, S <: NamedTuple} <: AbstractVector{T}
     end
 end
 
-@generated NamedTuple(hv::HeterogeneousVector) = :(getfield(hv, :x))
+# @generated NamedTuple(hv::HeterogeneousVector) = :(getfield(hv, :x))
+@generated NamedTuple(hv::AbstractHeterogeneousVector{T,S}) where {T,S} = :(getfield(hv, :x))
+
+## Custom property access for clean external interface
+## Note: For accessing the named tuple field x, we must use getfield or invoking NamedTuple
+# @inline Base.@constprop :aggressive function Base.getproperty(
+#         hv::HeterogeneousVector, name::Symbol
+# )
+#     if name in propertynames(hv)
+#         #  Access field and unwrap if it's a Ref
+#         field = getfield(NamedTuple(hv), name)
+#         return _unwrap(field)
+#     else
+#         error("HeterogeneousVector has no field $name")
+#     end
+# end
+#
+# @inline Base.@constprop :aggressive function Base.setproperty!(
+#         hv::HeterogeneousVector, name::Symbol, value
+# )
+#     if name in propertynames(hv)
+#         # Set field value, wrapping in Ref if it's a scalar
+#         field = getfield(NamedTuple(hv), name)
+#         _set_value!(field, value)
+#     else
+#         error("HeterogeneousVector has no field $name")
+#     end
+# end
 
 # Custom property access for clean external interface
 # Note: For accessing the named tuple field x, we must use getfield or invoking NamedTuple
-@inline Base.@constprop :aggressive function Base.getproperty(
-        hv::HeterogeneousVector, name::Symbol
-)
+@inline Base.@constprop :aggressive function Base.getproperty(hv::AbstractHeterogeneousVector, name::Symbol)
     if name in propertynames(hv)
         #  Access field and unwrap if it's a Ref
         field = getfield(NamedTuple(hv), name)
         return _unwrap(field)
     else
-        error("HeterogeneousVector has no field $name")
+        # error("Heterogeneous vector has no field $name")
+        tname = nameof(typeof(hv))
+        avail = propertynames(hv)
+        # error("$(tname) has no field $(name). Available fields: $(join(string.(avail), \", \"))")
+        msg = string(string(nameof(typeof(hv))), " has no field ", name,
+        ". Available fields: ", join(collect(string.(propertynames(hv))), ", "))
+        error(msg)
     end
 end
 
-@inline Base.@constprop :aggressive function Base.setproperty!(
-        hv::HeterogeneousVector, name::Symbol, value
-)
+@inline Base.@constprop :aggressive function Base.setproperty!(hv::AbstractHeterogeneousVector, name::Symbol, value)
     if name in propertynames(hv)
         # Set field value, wrapping in Ref if it's a scalar
         field = getfield(NamedTuple(hv), name)
         _set_value!(field, value)
     else
-        error("HeterogeneousVector has no field $name")
+        # error("Heterogeneous vector has no field $name")
+        tname = nameof(typeof(hv))
+        avail = propertynames(hv)
+        # error("$(tname) has no field $(name). Available fields: $(join(string.(avail), \", \"))")
+        msg = string(string(nameof(typeof(hv))), " has no field ", name,
+        ". Available fields: ", join(collect(string.(propertynames(hv))), ", "))
+        error(msg)
     end
 end
 
-@generated Base.propertynames(::HeterogeneousVector{T, S}) where {T, S} = :(fieldnames(S))
+# @generated Base.propertynames(::HeterogeneousVector{T, S}) where {T, S} = :(fieldnames(S))
+@generated Base.propertynames(::AbstractHeterogeneousVector{T, S}) where {T, S} = :(fieldnames(S))
 
-Base.pairs(hv::HeterogeneousVector{T, S}) where {S, T} = pairs(NamedTuple(hv))
+# Base.pairs(hv::HeterogeneousVector{T, S}) where {S, T} = pairs(NamedTuple(hv))
+Base.pairs(hv::AbstractHeterogeneousVector{T, S}) where {S, T} = pairs(NamedTuple(hv))
 
-function Base.getindex(hv::HeterogeneousVector{T, S}, idx::Int) where {T, S}
+# function Base.getindex(hv::HeterogeneousVector{T, S}, idx::Int) where {T, S}
+#     current_idx = 1
+#     for (name, field) in pairs(hv)
+#         unwrapped_field = _unwrap(field)
+#         if unwrapped_field isa AbstractArray
+#             field_length = length(unwrapped_field)
+#             if current_idx <= idx < current_idx + field_length
+#                 return unwrapped_field[idx - current_idx + 1]
+#             end
+#             current_idx += field_length
+#         else
+#             if idx == current_idx
+#                 return unwrapped_field
+#             end
+#             current_idx += 1
+#         end
+#     end
+#     throw(BoundsError(hv, idx))
+# end
+
+function Base.getindex(hv::AbstractHeterogeneousVector{T, S}, idx::Int) where {T, S}
     current_idx = 1
     for (name, field) in pairs(hv)
         unwrapped_field = _unwrap(field)
@@ -105,7 +164,29 @@ function Base.getindex(hv::HeterogeneousVector{T, S}, idx::Int) where {T, S}
     throw(BoundsError(hv, idx))
 end
 
-function Base.setindex!(hv::HeterogeneousVector{T, S}, val, idx::Int) where {T, S}
+# function Base.setindex!(hv::HeterogeneousVector{T, S}, val, idx::Int) where {T, S}
+#     current_idx = 1
+#     for (name, field) in pairs(hv)
+#         if field isa AbstractArray
+#             field_length = length(field)
+#             if current_idx <= idx < current_idx + field_length
+#                 field[idx - current_idx + 1] = val
+#                 return val
+#             end
+#             current_idx += field_length
+#         else
+#             if idx == current_idx
+#                 # Mutate the Ref directly
+#                 _set_value!(field, val)
+#                 return val
+#             end
+#             current_idx += 1
+#         end
+#     end
+#     throw(BoundsError(hv, idx))
+# end
+
+function Base.setindex!(hv::AbstractHeterogeneousVector{T, S}, val, idx::Int) where {T, S}
     current_idx = 1
     for (name, field) in pairs(hv)
         if field isa AbstractArray
@@ -117,7 +198,6 @@ function Base.setindex!(hv::HeterogeneousVector{T, S}, val, idx::Int) where {T, 
             current_idx += field_length
         else
             if idx == current_idx
-                # Mutate the Ref directly
                 _set_value!(field, val)
                 return val
             end
@@ -130,11 +210,15 @@ end
 _field_length(field::Ref) = 1
 _field_length(field::AbstractArray) = length(field)
 # Update length calculation
-Base.length(hv::HeterogeneousVector) = sum(_field_length, NamedTuple(hv))
+# Base.length(hv::HeterogeneousVector) = sum(_field_length, NamedTuple(hv))
+Base.length(hv::AbstractHeterogeneousVector) = sum(_field_length, NamedTuple(hv))
 
-Base.size(hv::HeterogeneousVector) = (length(hv),)
-Base.firstindex(hv::HeterogeneousVector) = 1
-Base.lastindex(hv::HeterogeneousVector) = length(hv)
+# Base.size(hv::HeterogeneousVector) = (length(hv),)
+# Base.firstindex(hv::HeterogeneousVector) = 1
+# Base.lastindex(hv::HeterogeneousVector) = length(hv)
+Base.size(hv::AbstractHeterogeneousVector) = (length(hv),)
+Base.firstindex(hv::AbstractHeterogeneousVector) = 1
+Base.lastindex(hv::AbstractHeterogeneousVector) = length(hv)
 
 _copy_field(field::Ref) = Ref(_unwrap(field))
 _copy_field(field::AbstractArray) = copy(field)
@@ -145,22 +229,36 @@ end
 
 _copy_field!(dst::Ref, src::Ref) = _set_value!(dst, _unwrap(src))
 _copy_field!(dst::AbstractArray, src::AbstractArray) = copy!(dst, src)
-function Base.copyto!(dst::HeterogeneousVector, src::HeterogeneousVector)
-    # Ensure both have the same structure
-    if propertynames(dst) != propertynames(src)
-        throw(ArgumentError("HeterogeneousVectors must have the same field names"))
-    end
+# function Base.copyto!(dst::HeterogeneousVector, src::HeterogeneousVector)
+#     # Ensure both have the same structure
+#     if propertynames(dst) != propertynames(src)
+#         throw(ArgumentError("HeterogeneousVectors must have the same field names"))
+#     end
+#
+#     for name in propertynames(dst)
+#         src_field = getfield(NamedTuple(src), name)
+#         dst_field = getfield(NamedTuple(dst), name)
+#
+#         _copy_field!(dst_field, src_field)
+#     end
+#     return dst
+# end
+#
+# Base.copy!(dst::HeterogeneousVector, src::HeterogeneousVector) = Base.copyto!(dst, src)
 
+function Base.copyto!(dst::AbstractHeterogeneousVector, src::AbstractHeterogeneousVector)
+    if propertynames(dst) != propertynames(src)
+        # throw(ArgumentError("HeterogeneousVectors must have the same field names"))
+        error("Cannot copy to $(nameof(typeof(dst))) with different field names: $(propertynames(dst)) vs $(propertynames(src))")
+    end
     for name in propertynames(dst)
         src_field = getfield(NamedTuple(src), name)
         dst_field = getfield(NamedTuple(dst), name)
-
         _copy_field!(dst_field, src_field)
     end
     return dst
 end
-
-Base.copy!(dst::HeterogeneousVector, src::HeterogeneousVector) = Base.copyto!(dst, src)
+Base.copy!(dst::AbstractHeterogeneousVector, src::AbstractHeterogeneousVector) = Base.copyto!(dst, src)
 
 _zero_field(field::Ref) = Ref(zero(_unwrap(field)))
 _zero_field(field::AbstractArray) = zero(field)
@@ -182,31 +280,47 @@ function Base.zero(hv::HeterogeneousVector)
 end
 
 # Broadcasting support for HeterogeneousVector
-function Base.BroadcastStyle(::Type{<:HeterogeneousVector{T, S}}) where {T, S}
-    Broadcast.Style{HeterogeneousVector{fieldnames(S)}}()
-end
+# function Base.BroadcastStyle(::Type{<:HeterogeneousVector{T, S}}) where {T, S}
+#     Broadcast.Style{HeterogeneousVector{fieldnames(S)}}()
+# end
+#
+# function Base.BroadcastStyle(
+#         ::Broadcast.Style{HeterogeneousVector{Names1}},
+#         ::Broadcast.Style{HeterogeneousVector{Names2}}
+# ) where {Names1, Names2}
+#     error(
+#         "Cannot broadcast HeterogeneousVectors with different field names: $(Names1) vs $(Names2)",
+#     )
+# end
+#
+# function Base.BroadcastStyle(
+#         ::Broadcast.Style{HeterogeneousVector{Names}},
+#         ::Broadcast.Style{HeterogeneousVector{Names}}
+# ) where {Names}
+#     Broadcast.Style{HeterogeneousVector{Names}}()
+# end
+#
+# # HeterogeneousVector style takes precedence over other broadcast styles
+# function Base.BroadcastStyle(
+#         ::Broadcast.Style{HeterogeneousVector{Names}}, ::Base.Broadcast.BroadcastStyle
+# ) where {Names}
+#     Broadcast.Style{HeterogeneousVector{Names}}()
+# end
 
-function Base.BroadcastStyle(
-        ::Broadcast.Style{HeterogeneousVector{Names1}},
-        ::Broadcast.Style{HeterogeneousVector{Names2}}
-) where {Names1, Names2}
-    error(
-        "Cannot broadcast HeterogeneousVectors with different field names: $(Names1) vs $(Names2)",
-    )
+# Broadcasting support for AbstractHeterogeneousVector
+function Base.BroadcastStyle(::Type{<:AbstractHeterogeneousVector{T, S}}) where {T, S}
+    Broadcast.Style{AbstractHeterogeneousVector{fieldnames(S)}}()
 end
-
-function Base.BroadcastStyle(
-        ::Broadcast.Style{HeterogeneousVector{Names}},
-        ::Broadcast.Style{HeterogeneousVector{Names}}
-) where {Names}
-    Broadcast.Style{HeterogeneousVector{Names}}()
+function Base.BroadcastStyle(::Broadcast.Style{AbstractHeterogeneousVector{Names1}},
+                             ::Broadcast.Style{AbstractHeterogeneousVector{Names2}}) where {Names1, Names2}
+    error("Cannot broadcast heterogeneous vectors with different field names: $(Names1) vs $(Names2)")
 end
-
-# HeterogeneousVector style takes precedence over other broadcast styles
-function Base.BroadcastStyle(
-        ::Broadcast.Style{HeterogeneousVector{Names}}, ::Base.Broadcast.BroadcastStyle
-) where {Names}
-    Broadcast.Style{HeterogeneousVector{Names}}()
+function Base.BroadcastStyle(::Broadcast.Style{AbstractHeterogeneousVector{Names}},
+                             ::Broadcast.Style{AbstractHeterogeneousVector{Names}}) where {Names}
+    Broadcast.Style{AbstractHeterogeneousVector{Names}}()
+end
+function Base.BroadcastStyle(::Broadcast.Style{AbstractHeterogeneousVector{Names}}, ::Base.Broadcast.BroadcastStyle) where {Names}
+    Broadcast.Style{AbstractHeterogeneousVector{Names}}()
 end
 
 # Helper function to find HeterogeneousVector in broadcast arguments
@@ -219,19 +333,32 @@ end
 find_heterogeneous_vector(x::Base.Broadcast.Extruded) = x.x
 find_heterogeneous_vector(x) = x
 find_heterogeneous_vector(::Tuple{}) = nothing
-find_heterogeneous_vector(x::HeterogeneousVector, rest) = x
+# find_heterogeneous_vector(x::HeterogeneousVector, rest) = x
+find_heterogeneous_vector(x::AbstractHeterogeneousVector, rest) = x
 find_heterogeneous_vector(::Any, rest) = find_heterogeneous_vector(rest)
 
-function Base.similar(
-        bc::Broadcast.Broadcasted{Broadcast.Style{HeterogeneousVector{Names}}}
-) where {Names}
+# function Base.similar(
+#         bc::Broadcast.Broadcasted{Broadcast.Style{HeterogeneousVector{Names}}}
+# ) where {Names}
+#     hv = find_heterogeneous_vector(bc)
+#     similar(hv)
+# end
+#
+# function Base.similar(
+#         bc::Broadcast.Broadcasted{Broadcast.Style{HeterogeneousVector{Names}}}, ::Type{ElType}
+# ) where {Names, ElType}
+#     hv = find_heterogeneous_vector(bc)
+#     similar_x = map(NamedTuple(hv)) do field
+#         _similar_field(field, ElType)
+#     end
+#     HeterogeneousVector(similar_x)
+# end
+
+function Base.similar(bc::Broadcast.Broadcasted{Broadcast.Style{AbstractHeterogeneousVector{Names}}}) where {Names}
     hv = find_heterogeneous_vector(bc)
     similar(hv)
 end
-
-function Base.similar(
-        bc::Broadcast.Broadcasted{Broadcast.Style{HeterogeneousVector{Names}}}, ::Type{ElType}
-) where {Names, ElType}
+function Base.similar(bc::Broadcast.Broadcasted{Broadcast.Style{AbstractHeterogeneousVector{Names}}}, ::Type{ElType}) where {Names, ElType}
     hv = find_heterogeneous_vector(bc)
     similar_x = map(NamedTuple(hv)) do field
         _similar_field(field, ElType)
@@ -300,7 +427,10 @@ end
                 break
             end
 
-            if ArgT <: HeterogeneousVector
+            # if ArgT <: HeterogeneousVector
+            #     current_arg_expr = :(getproperty($current_arg_expr, $(QuoteNode(field))))
+            # end
+            if ArgT <: AbstractHeterogeneousVector
                 current_arg_expr = :(getproperty($current_arg_expr, $(QuoteNode(field))))
             end
             push!(res, current_arg_expr)
@@ -321,11 +451,20 @@ end
 # Using the low-level functions Broadcast.broadcasted or Broadcast.Broadcasted incur considerable
 # overhead due to some oddities in the Julia compiler when the arg tuple is not a bitset
 
+# function Base.copy(
+#         bc::Broadcast.Broadcasted{Broadcast.Style{HeterogeneousVector{Names}}}
+# ) where {Names}
+#     # Apply broadcast to each field
+#     function map_fun(::Val{name}) where {name}
+#         bc_unpacked = unpack_broadcast(bc, Val(name))
+#         Broadcast.materialize(bc_unpacked)
+#     end
+#     res_args = map(map_fun, Val.(Names))
+#     HeterogeneousVector(NamedTuple{Names}(res_args))
+# end
+
 # Broadcasting implementation
-function Base.copy(
-        bc::Broadcast.Broadcasted{Broadcast.Style{HeterogeneousVector{Names}}}
-) where {Names}
-    # Apply broadcast to each field
+function Base.copy(bc::Broadcast.Broadcasted{Broadcast.Style{AbstractHeterogeneousVector{Names}}}) where {Names}
     function map_fun(::Val{name}) where {name}
         bc_unpacked = unpack_broadcast(bc, Val(name))
         Broadcast.materialize(bc_unpacked)
@@ -334,20 +473,44 @@ function Base.copy(
     HeterogeneousVector(NamedTuple{Names}(res_args))
 end
 
+# @inline Base.@constprop :aggressive function Base.copyto!(
+#         dest::HeterogeneousVector{T, S},
+#         bc::Broadcast.Broadcasted{
+#             Broadcast.Style{HeterogeneousVector{Names}}, Axes, F, Args}
+# ) where {T, S, Names, Axes, F, Args <: Tuple}
+#     if fieldnames(S) != Names
+#         throw(
+#             ArgumentError(
+#             "Cannot copy to HeterogeneousVector with different field names: $(fieldnames(S)) vs $(Names)",
+#         ),
+#         )
+#     end
+#     f = bc.f
+#     args = bc.args
+#     # Using value types to specialize map_fun is indeed an ugly solution
+#     # Constant propagation should **usually** make this unnecessary, but
+#     # benchmarking has shown there are cases where this does not happen (even with aggressive const propagation),
+#     # causing type unstability and costly runtime dispatch
+#     function map_fun(::Val{name}) where {name}
+#         target_field = getfield(NamedTuple(dest), name)
+#         bc_unpacked = unpack_broadcast(bc, Val(name))
+#         if target_field isa Ref
+#             target_field[] = Broadcast.materialize(bc_unpacked)
+#         else
+#             Broadcast.materialize!(target_field, bc_unpacked)
+#         end
+#     end
+#     map(map_fun, Val.(Names))
+#     dest
+# end
+
 @inline Base.@constprop :aggressive function Base.copyto!(
-        dest::HeterogeneousVector{T, S},
-        bc::Broadcast.Broadcasted{
-            Broadcast.Style{HeterogeneousVector{Names}}, Axes, F, Args}
+    dest::AbstractHeterogeneousVector{T, S},
+    bc::Broadcast.Broadcasted{Broadcast.Style{AbstractHeterogeneousVector{Names}}, Axes, F, Args}
 ) where {T, S, Names, Axes, F, Args <: Tuple}
     if fieldnames(S) != Names
-        throw(
-            ArgumentError(
-            "Cannot copy to HeterogeneousVector with different field names: $(fieldnames(S)) vs $(Names)",
-        ),
-        )
+        throw(ArgumentError("Cannot copy to heterogeneous vector with different field names: $(fieldnames(S)) vs $(Names)"))
     end
-    f = bc.f
-    args = bc.args
     # Using value types to specialize map_fun is indeed an ugly solution
     # Constant propagation should **usually** make this unnecessary, but
     # benchmarking has shown there are cases where this does not happen (even with aggressive const propagation),
@@ -392,12 +555,30 @@ function _compute_segment_ranges(x::NamedTuple)
 end
 
 # Written specifically to deal with cases such as calculate_residuals!() where the destination is an ordinary Array
+# @inline Base.@constprop :aggressive function Base.copyto!(
+#         dest::AbstractArray,
+#         bc::Broadcast.Broadcasted{Broadcast.Style{HeterogeneousVector{Names}}}
+# ) where {Names}
+#     hv = find_heterogeneous_vector(bc)
+#     # Points to the first index of the destination array
+#     dest_idx = firstindex(dest)
+#     segment_ranges = _compute_segment_ranges(NamedTuple(hv))
+#     function map_fun(::Val{name}) where {name}
+#         bc_unpacked = unpack_broadcast(bc, Val(name))
+#         segment_range = segment_ranges[name]
+#         dest_segment = view(dest, dest_idx .+ segment_range)
+#         Broadcast.materialize!(dest_segment, bc_unpacked)
+#     end
+#     map(map_fun, Val.(Names))
+#     return dest
+# end
+
+# Written specifically to deal with cases such as calculate_residuals!() where the destination is an ordinary Array
 @inline Base.@constprop :aggressive function Base.copyto!(
-        dest::AbstractArray,
-        bc::Broadcast.Broadcasted{Broadcast.Style{HeterogeneousVector{Names}}}
+    dest::AbstractArray,
+    bc::Broadcast.Broadcasted{Broadcast.Style{AbstractHeterogeneousVector{Names}}}
 ) where {Names}
     hv = find_heterogeneous_vector(bc)
-    # Points to the first index of the destination array
     dest_idx = firstindex(dest)
     segment_ranges = _compute_segment_ranges(NamedTuple(hv))
     function map_fun(::Val{name}) where {name}
@@ -410,9 +591,15 @@ end
     return dest
 end
 
-# Show methods for HeterogeneousVector
-Base.summary(hv::HeterogeneousVector) = string(typeof(hv), " with members:")
-function Base.show(io::IO, m::MIME"text/plain", hv::HeterogeneousVector)
+# # Show methods for HeterogeneousVector
+# Base.summary(hv::HeterogeneousVector) = string(typeof(hv), " with members:")
+# function Base.show(io::IO, m::MIME"text/plain", hv::HeterogeneousVector)
+#     show(io, m, NamedTuple(hv))
+# end
+
+# Show methods for AbstractHeterogeneousVector
+Base.summary(hv::AbstractHeterogeneousVector) = string(typeof(hv), " with members:")
+function Base.show(io::IO, m::MIME"text/plain", hv::AbstractHeterogeneousVector)
     show(io, m, NamedTuple(hv))
 end
 
@@ -472,7 +659,9 @@ function Base.iterate(it::Chain, state)
     return xs_state[1], (i, xs_state[2])
 end
 
-Base.iterate(x::HeterogeneousVector) = iterate(Chain(values(NamedTuple(x))))
-Base.iterate(x::HeterogeneousVector, state) = iterate(Chain(values(NamedTuple(x))), state)
+# Base.iterate(x::HeterogeneousVector) = iterate(Chain(values(NamedTuple(x))))
+# Base.iterate(x::HeterogeneousVector, state) = iterate(Chain(values(NamedTuple(x))), state)
 
+Base.iterate(x::AbstractHeterogeneousVector) = iterate(Chain(values(NamedTuple(x))))
+Base.iterate(x::AbstractHeterogeneousVector, state) = iterate(Chain(values(NamedTuple(x))), state)
 end # module HeterogeneousArrays

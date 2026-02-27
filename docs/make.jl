@@ -7,7 +7,7 @@ makedocs(
     format = Documenter.HTML(),           # Generate HTML documentation
     pages = [
         "Home" => "index.md",             # Main page
-        "API Reference" => "api.md",      # API documentation
+        "API Reference" => "api.md"      # API documentation
     ],
     checkdocs = :exports                  # Only check exported symbols
 )

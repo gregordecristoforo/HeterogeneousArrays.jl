@@ -53,7 +53,6 @@ _set_value!(x::Ref, val) = (x[] = val)
 _set_value!(x::AbstractArray, val::AbstractArray) = copy!(x, val)
 _set_value!(x::AbstractArray, val, idx) = (x[idx] = val)
 
-
 """
     HeterogeneousVector{T, S} <: AbstractVector{T}
 

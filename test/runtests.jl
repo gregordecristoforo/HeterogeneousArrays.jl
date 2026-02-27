@@ -133,4 +133,13 @@ using Unitful
         @test fifth_element == 2.0u"m/s"
         # Ensure iteration ends
     end
+    @testset "Show and Summary Methods" begin
+        hv = HeterogeneousVector(a = [1, 2, 3], b = 4.5, c = [6.7u"m", 8.9u"m"])
+        @testset "Base.summary" begin
+            # Test the summary method
+            summary_output = summary(hv)
+            expected_summary = string(typeof(hv), " with members:")
+            @test summary_output == expected_summary
+        end
+    end
 end

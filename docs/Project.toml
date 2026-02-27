@@ -1,0 +1,10 @@
+[deps]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+HeterogeneousArrays = "40d36c5c-e028-4551-8108-c37812a952b9"
+Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
+
+[sources]
+HeterogeneousArrays = {path = ".."}
+
+[compat]
+Documenter = "1.17.0"

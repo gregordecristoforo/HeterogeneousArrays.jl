@@ -1,4 +1,29 @@
 module HeterogeneousArrays
+"""
+    HeterogeneousArrays
+
+A Julia package for efficiently storing and operating on heterogeneous data with type-stable broadcasting.
+
+The primary type is [`HeterogeneousVector`](@ref), which allows combining different concrete types 
+(including quantities with units) into a single broadcastable vector.
+
+# Features
+- Type-stable broadcasting operations
+- Support for Unitful quantities with mixed units
+- Efficient array-like interface
+- Named field access for clarity
+
+# Example
+```jldoctest
+julia> using HeterogeneousArrays, Unitful
+
+julia> v = HeterogeneousVector(position = 3.0u"m", time = 5.0u"s", count = 42)
+
+julia> v.position
+3.0 m
+
+julia> 2.0 .* v .+ v  # Type-stable broadcasting
+"""
 
 export HeterogeneousVector
 
@@ -26,8 +51,57 @@ _set_value!(x::Ref, val) = (x[] = val)
 _set_value!(x::AbstractArray, val::AbstractArray) = copy!(x, val)
 _set_value!(x::AbstractArray, val, idx) = (x[idx] = val)
 
+"""
+    HeterogeneousVector{T, S} <: AbstractVector{T}
+
+A segmented vector that stores mixed types while maintaining type-stable broadcasting.
+
+Fields can contain scalars (wrapped for mutability), arrays, or quantities with units.
+The flattened view presents all elements as a single `AbstractVector` for broadcasting.
+
+# Constructors
+
+- `HeterogeneousVector(; kwargs...)` - Create with named fields
+- `HeterogeneousVector(args...)` - Create with positional args (auto-named field_1, field_2, ...)
+- `HeterogeneousVector(x::NamedTuple)` - Create from a NamedTuple
+
+# Arguments
+- `x::NamedTuple`: Internal storage (users shouldn't access directly)
+
+# Examples
+
+Named fields:
+```jldoctest
+julia> using HeterogeneousArrays
+
+julia> v = HeterogeneousVector(x = 1.0, y = 2.5, z = [1, 2, 3])
+"""
+
 struct HeterogeneousVector{T, S <: NamedTuple} <: AbstractVector{T}
     x::S
+    """
+        HeterogeneousVector(x::NamedTuple)
+
+    Construct a HeterogeneousVector from an existing NamedTuple.
+
+    Scalar fields are automatically wrapped in `Ref` for mutability.
+
+    # Arguments
+    - `x::NamedTuple`: The data to store
+
+    # Examples
+    ```jldoctest
+    julia> using HeterogeneousArrays
+
+    julia> nt = (x = 1.0, y = 2.0, z = [1, 2, 3])
+
+    julia> v = HeterogeneousVector(nt)
+    ```
+
+    # See Also
+    - `HeterogeneousVector(; kwargs...)`
+    - `HeterogeneousVector(args...)`
+    """
     function HeterogeneousVector(x::NamedTuple)
         # Wrap scalar fields in Ref for mutability
         mutable_x = map(_make_mutable, x)
@@ -39,13 +113,54 @@ struct HeterogeneousVector{T, S <: NamedTuple} <: AbstractVector{T}
         new{T, typeof(mutable_x)}(mutable_x)
     end
 
-    # Constructor with keyword arguments
+    """
+        HeterogeneousVector(; kwargs...)
+
+    Construct a HeterogeneousVector with named fields.
+
+    # Arguments
+    - Arbitrary keyword arguments become named fields
+
+    # Examples
+    ```jldoctest
+    julia> using HeterogeneousArrays
+
+    julia> v = HeterogeneousVector(x = 1.0, y = 2.0, data = [1, 2, 3])
+    ```
+
+    # See Also
+    - `HeterogeneousVector(x::NamedTuple)`
+    - `HeterogeneousVector(args...)`
+    """
     function HeterogeneousVector(; kwargs...)
         x = NamedTuple(kwargs)
         HeterogeneousVector(x)
     end
 
-    # Constructor with positional arguments
+    """
+        HeterogeneousVector(args...)
+
+    Construct a HeterogeneousVector with positional arguments.
+
+    Fields are automatically named `field_1`, `field_2`, etc.
+
+    # Arguments
+    - `args...`: Values to store (scalars or arrays)
+
+    # Examples
+    ```jldoctest
+    julia> using HeterogeneousArrays
+
+    julia> v = HeterogeneousVector(1.0, 2.0, [1, 2, 3])
+
+    julia> v.field_1
+    1.0
+    ```
+
+    # See Also
+    - `HeterogeneousVector(x::NamedTuple)`
+    - `HeterogeneousVector(; kwargs...)`
+    """
     function HeterogeneousVector(args...)
         names = ntuple(i -> Symbol("field_$i"), length(args))
         x = NamedTuple{names}(args)
@@ -57,6 +172,32 @@ end
 
 # Custom property access for clean external interface
 # Note: For accessing the named tuple field x, we must use getfield or invoking NamedTuple
+"""
+    Base.getproperty(hv::HeterogeneousVector, name::Symbol)
+
+Access a named field in the HeterogeneousVector.
+
+# Arguments
+- `hv::HeterogeneousVector`: The vector
+- `name::Symbol`: Field name
+
+# Returns
+The value of the field (unwrapped if it's a scalar)
+
+# Examples
+```jldoctest
+julia> using HeterogeneousArrays
+
+julia> v = HeterogeneousVector(x = 1.0, y = 2.0);
+
+julia> v.x
+1.0
+```
+
+# See Also
+- `Base.setproperty!(::HeterogeneousVector, ::Symbol, ::Any)`
+- `propertynames`
+"""
 @inline Base.@constprop :aggressive function Base.getproperty(
         hv::HeterogeneousVector, name::Symbol
 )
@@ -69,6 +210,32 @@ end
     end
 end
 
+"""
+    Base.setproperty!(hv::HeterogeneousVector, name::Symbol, value)
+
+Set a named field in the HeterogeneousVector.
+
+# Arguments
+- `hv::HeterogeneousVector`: The vector
+- `name::Symbol`: Field name  
+- `value`: New value for the field
+
+# Examples
+```jldoctest
+julia> using HeterogeneousArrays
+
+julia> v = HeterogeneousVector(x = 1.0, y = 2.0);
+
+julia> v.x = 5.0;
+
+julia> v.x
+5.0
+```
+
+# See Also
+- `Base.getproperty(::HeterogeneousVector, ::Symbol)`
+- `propertynames`
+"""
 @inline Base.@constprop :aggressive function Base.setproperty!(
         hv::HeterogeneousVector, name::Symbol, value
 )
@@ -431,7 +598,7 @@ end
 
 Iterate through any number of iterators in sequence.
 
-```jldoctest
+```julia
 julia> for i in chain(1:3, ['a', 'b', 'c'])
            @show i
        end

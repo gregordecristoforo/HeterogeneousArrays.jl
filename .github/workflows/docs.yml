@@ -1,0 +1,50 @@
+name: Documentation
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'src/**'
+      - 'docs/**'
+      - 'Project.toml'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    branches:
+      - main
+      - master
+    paths:
+      - 'src/**'
+      - 'docs/**'
+      - 'Project.toml'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Julia
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: '1.12'
+      
+      - name: Cache Julia
+        uses: julia-actions/cache@v1
+      
+      - name: Build documentation
+        run: |
+          cd docs
+          julia --project=. -e '
+            using Pkg
+            Pkg.instantiate()
+            include("make.jl")
+          '
+      
+      - name: Deploy to GitHub Pages
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs/build

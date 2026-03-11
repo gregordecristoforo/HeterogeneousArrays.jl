@@ -201,14 +201,14 @@ end
         # Define the exact Quantity type we expect
         # We use u"m" directly in the type construction for clarity
         TargetUnitType = Quantity{Float64, L_dim, typeof(u"m")}
-        
+
         y = @inferred similar(x, TargetUnitType, Float64)
-        
+
         @test y isa HeterogeneousVector
         # Test the eltype directly (this is usually more stable)
         @test eltype(y.pos) === TargetUnitType
         @test eltype(y.id) === Float64
-        
+
         # To avoid the 'showrep' bug if this fails, we check the unit 
         # by converting it to a string or comparing to a simple unit.
         @test unit(y.pos[1]) === u"m"
@@ -229,21 +229,21 @@ end
 @testset "Zero-Initialization" begin
     # pos is Vector{Length}, id is Vector{Int}
     x = HeterogeneousVector(pos = [1.0, 2.0]u"m", id = [10, 20])
-    
+
     # Generate the zero representation
     z = @inferred zero(x)
-    
+
     @test z isa HeterogeneousVector
     @test propertynames(z) == (:pos, :id)
-    
+
     # Check numerical values
     @test all(z.pos .== 0.0u"m")
     @test all(z.id .== 0)
-    
+
     # Ensure types and units are strictly preserved
     @test eltype(z.pos) === eltype(x.pos)
     @test eltype(z.id) === eltype(x.id)
-    
+
     # Ensure it is a new allocation (not a view/alias)
     @test z.pos !== x.pos
     @test z.id !== x.id

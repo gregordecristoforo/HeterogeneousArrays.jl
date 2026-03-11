@@ -401,7 +401,6 @@ end
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 # Check with Jakob Peder Pettersen whether this is still in line with his plans for the API, as this is a bit of an edge case and we might want to throw an error instead
 
-
 """
     Base.similar(hv::HeterogeneousVector, ::Type{T}, ::Type{S}, R::DataType...)
 
@@ -429,10 +428,11 @@ heterogeneity (e.g., keeping one field as an `Int` while converting another to a
 This function uses `ntuple` with a compile-time length to ensure the resulting 
 `NamedTuple` is type-inferred correctly by the Julia compiler.
 """
-function Base.similar(hv::HeterogeneousVector, ::Type{T}, ::Type{S}, R::DataType...) where {T, S}
+function Base.similar(hv::HeterogeneousVector, ::Type{T}, ::Type{S}, R::DataType...) where {
+        T, S}
     new_types = (T, S, R...)
     names = propertynames(hv)
-    
+
     if length(new_types) != length(names)
         throw(DimensionMismatch("Number of types ($(length(new_types))) must match number of fields ($(length(names)))"))
     end

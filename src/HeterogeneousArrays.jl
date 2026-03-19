@@ -23,6 +23,7 @@ julia> v.position
 3.0 m
 
 julia> 2.0 .* v .+ v  # Type-stable broadcasting
+```
 """
 
 using Unitful: Unitful

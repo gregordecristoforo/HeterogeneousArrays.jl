@@ -1,6 +1,39 @@
 _copy_field(field::Ref) = Ref(_unwrap(field))
 _copy_field(field::AbstractArray) = copy(field)
 
+"""
+    Base.copy(hv::HeterogeneousVector) -> HeterogeneousVector
+
+Create a shallow copy of a HeterogeneousVector.
+
+For scalar fields, the wrapper `Ref` is copied (the new vector has its own mutable container).
+For array fields, the array is deeply copied via `copy()`, creating independent storage.
+
+# Arguments
+- `hv`: The HeterogeneousVector to copy
+
+# Returns
+A new HeterogeneousVector with the same structure and field names
+
+# Examples
+```jldoctest
+julia> using HeterogeneousArrays
+
+julia> v = HeterogeneousVector(a = [1, 2], b = 3.0);
+
+julia> w = copy(v);
+
+julia> w.a[1] = 99;  # Modifying copy does not affect original
+
+julia> v.a[1]
+1
+
+julia> w.b = 5.0;  # Scalar field is independent
+
+julia> v.b
+3.0
+```
+"""
 function Base.copy(hv::HeterogeneousVector)
     copied_x = map(_copy_field, NamedTuple(hv))
     HeterogeneousVector(copied_x)
@@ -9,6 +42,40 @@ end
 _copy_field!(dst::Ref, src::Ref) = _set_value!(dst, _unwrap(src))
 _copy_field!(dst::AbstractArray, src::AbstractArray) = copy!(dst, src)
 
+"""
+    Base.copyto!(dst::AbstractHeterogeneousVector, src::AbstractHeterogeneousVector) -> AbstractHeterogeneousVector
+
+Copy data from a source HeterogeneousVector into a destination HeterogeneousVector.
+
+Both vectors must have the same field names. Data is copied in-place into the destination's 
+existing storage, preserving its array references for array fields and updating scalar wrappings.
+
+# Arguments
+- `dst`: The destination vector (will be modified)
+- `src`: The source vector (unchanged)
+
+# Returns
+The modified `dst` vector
+
+# Errors
+- Throws an `error` if `dst` and `src` have different field names
+
+# Examples
+```jldoctest
+julia> using HeterogeneousArrays
+
+julia> v = HeterogeneousVector(a = [1, 2], b = 3.0);
+
+julia> w = zero(v);  # Create an empty vector with same structure
+
+julia> copyto!(w, v);  # Copy data from v into w
+
+julia> w.a
+2-element Vector{Int64}:
+ 1
+ 2
+```
+"""
 function Base.copyto!(dst::AbstractHeterogeneousVector, src::AbstractHeterogeneousVector)
     if propertynames(dst) != propertynames(src)
         error("Cannot copy to $(nameof(typeof(dst))) with different field names: $(propertynames(dst)) vs $(propertynames(src))")
@@ -33,11 +100,68 @@ _similar_field(field::Ref, ::Type{ElType}) where {ElType} = Ref(zero(ElType))
 _similar_field(field::AbstractArray) = similar(field)
 _similar_field(field::AbstractArray, ::Type{ElType}) where {ElType} = similar(field, ElType)
 
+"""
+    Base.similar(hv::HeterogeneousVector) -> HeterogeneousVector
+
+Create a new HeterogeneousVector with the same structure and field names, with uninitialized storage.
+
+Each field is initialized by calling `similar()` on its type, creating uninitialized (or zeroed) 
+storage of the same shape and element type as the original. Use `zero()` if you want zeroed values.
+
+# Arguments
+- `hv`: The template HeterogeneousVector
+
+# Returns
+A new HeterogeneousVector with the same field names and types, containing uninitialized data
+
+# Examples
+```jldoctest
+julia> using HeterogeneousArrays
+
+julia> v = HeterogeneousVector(a = [1, 2], b = 3.0);
+
+julia> s = similar(v);
+
+julia> length(s.a)
+2
+```
+"""
 function Base.similar(hv::HeterogeneousVector{T}) where {T}
     similar_x = map(_zero_field, NamedTuple(hv))
     HeterogeneousVector(similar_x)
 end
 
+"""
+    Base.zero(hv::HeterogeneousVector) -> HeterogeneousVector
+
+Create a new HeterogeneousVector filled with zero values matching the structure of `hv`.
+
+Each field is zeroed according to its element type. Scalar fields receive `zero(T)`, and 
+array fields receive `zero(array)` (an all-zeros array of the same shape).
+
+# Arguments
+- `hv`: The template HeterogeneousVector
+
+# Returns
+A new HeterogeneousVector with the same field names and types, filled with zeros
+
+# Examples
+```jldoctest
+julia> using HeterogeneousArrays
+
+julia> v = HeterogeneousVector(a = [1, 2], b = 3.0);
+
+julia> z = zero(v);
+
+julia> z.a
+2-element Vector{Int64}:
+ 0
+ 0
+
+julia> z.b
+0.0
+```
+"""
 function Base.zero(hv::HeterogeneousVector)
     zero_x = map(_zero_field, NamedTuple(hv))
     HeterogeneousVector(zero_x)
@@ -154,7 +278,7 @@ Float64
 julia> # Typos in field names will now trigger an error
        similar(v, poss = Float64)
 ERROR: ArgumentError: Field 'poss' does not exist in HeterogeneousVector. Available fields: (:pos, :id)
-
+```
 """
 function Base.similar(hv::HeterogeneousVector{T, S}; kwargs...) where {T, S}
     names = propertynames(hv)

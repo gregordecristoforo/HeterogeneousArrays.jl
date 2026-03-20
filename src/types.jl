@@ -1,3 +1,8 @@
+"""
+    AbstractHeterogeneousVector{T, S} <: AbstractVector{T}
+
+The abstract base type for all heterogeneous vectors.
+"""
 abstract type AbstractHeterogeneousVector{T, S} <: AbstractVector{T} end
 
 # Copy-catted from DiffEqBase DiffEqBaseUnitfulExt.jl

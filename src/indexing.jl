@@ -160,7 +160,6 @@ julia> length(v)  # 3 (from 'a') + 1 (from 'b') + 2 (from 'c')
 6
 ```
 """
-# Update length calculation
 Base.length(hv::AbstractHeterogeneousVector) = sum(_field_length, NamedTuple(hv))
 
 """

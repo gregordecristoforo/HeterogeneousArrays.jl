@@ -16,14 +16,14 @@ Base.getindex(::AbstractHeterogeneousVector, ::Int)
 Base.setindex!(::AbstractHeterogeneousVector, ::Any, ::Int)
 Base.length(::AbstractHeterogeneousVector)
 Base.size(::AbstractHeterogeneousVector)
-Base.iterate(::AbstractHeterogeneousVector)
+Base.iterate(::AbstractHeterogeneousVector, ::Any)
 ```
 
 ## Property Access
 
 ```@docs
-Base.getproperty(::HeterogeneousVector, ::Symbol)
-Base.setproperty!(::HeterogeneousVector, ::Symbol, ::Any)
+Base.getproperty(::AbstractHeterogeneousVector, ::Symbol)
+Base.setproperty!(::AbstractHeterogeneousVector, ::Symbol, ::Any)
 ```
 
 ## Allocation & Copying
@@ -32,7 +32,7 @@ Base.setproperty!(::HeterogeneousVector, ::Symbol, ::Any)
 Base.copy(::AbstractHeterogeneousVector)
 Base.copyto!
 Base.similar(::AbstractHeterogeneousVector)
-Base.zero(::AbstractHeterogeneousVector)
+Base.zero(::HeterogeneousVector)
 ```
 
 ## Broadcasting
@@ -40,4 +40,3 @@ Base.zero(::AbstractHeterogeneousVector)
 ```@docs
 Base.BroadcastStyle(::Type{HeterogeneousVector})
 ```
-

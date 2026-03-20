@@ -38,23 +38,6 @@ for i in 1:length(v)
 end
 ```
 
-## Benchmark
-
-```julia
-v = HeterogeneousVector(a = randn(1000), b = randn(1000), c = 1:1000)
-
-# Fast: Named fields, ~0.02 ms
-@time result = v.a .* 2.0 .+ v.b
-
-# Slow: Flattened indexing, ~0.8 ms (40x slower)
-@time begin
-    total = 0.0
-    for i in 1:length(v)
-        total += v[i]
-    end
-end
-```
-
 ## Best Practices
 
 | Goal | Use | Type-Stable? |

@@ -2,7 +2,7 @@
 
 `HeterogeneousVector` is designed for type-stable operations. Not all usage patterns are equally fast.
 
-## The Core Issue: Type Stability
+## Type Stability
 
 Julia's compiler optimizes when types are known at compile time. When types are unknown, the compiler must generate conservative (slow) code for multiple possibilities.
 

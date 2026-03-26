@@ -303,12 +303,15 @@ For a vector with fields `pos` (length 2) and `time` (length 1):
 julia> using HeterogeneousArrays, Unitful
 
 julia> v = HeterogeneousVector(pos = [1.0u"m", 2.0u"m"], time = 10.0u"s");
+
 julia> v_proj = HeterogeneousVector(pos = [1.5u"m", 3.0u"m"], time = 5.0u"s");
 
 julia> # The ODE solver provides a plain Vector{Float64}
+
 julia> residuals = Vector{Float64}(undef, length(v));
 
 julia> # This triggers the flattening copyto!
+
 julia> residuals .= ustrip.(v .- v_proj);
 
 julia> residuals

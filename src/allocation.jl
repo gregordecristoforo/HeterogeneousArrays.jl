@@ -4,10 +4,10 @@ _copy_field(field::AbstractArray) = copy(field)
 """
     Base.copy(hv::HeterogeneousVector) -> HeterogeneousVector
 
-Create a shallow copy of a HeterogeneousVector.
+Create a deep copy of a `HeterogeneousVector`.
 
-For scalar fields, the wrapper `Ref` is copied (the new vector has its own mutable container).
-For array fields, the array is deeply copied via `copy()`, creating independent storage.
+This allocates new underlying storage for the vector so that top-level modifications 
+(like reassigning an array element or changing a scalar) do not affect the original. 
 
 # Arguments
 - `hv`: The HeterogeneousVector to copy

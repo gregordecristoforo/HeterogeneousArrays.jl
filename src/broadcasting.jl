@@ -284,43 +284,38 @@ function _compute_segment_ranges(x::NamedTuple)
 end
 
 """
-    Base.copyto!(dest::AbstractArray, bc::Broadcast.Broadcasted{Broadcast.Style{AbstractHeterogeneousVector}}) -> AbstractArray
+    Base.copyto!(dest::AbstractArray, bc::Broadcast.Broadcasted{Broadcast.Style{AbstractHeterogeneousVector{Names}}})
 
 Materialize a HeterogeneousVector broadcast result into a flat AbstractArray.
 
-This method flattens the HeterogeneousVector structure into a single dense array, using 
-segment ranges to map each field's result into the corresponding portion of the destination. 
-This is useful when you need to convert a heterogeneous broadcast result into a standard array.
-
-# Arguments
-- `dest`: A pre-allocated AbstractArray to receive the flattened broadcast result
-- `bc`: A broadcasted expression tree involving a HeterogeneousVector
-
-# Returns
-The modified `dest` array containing flattened results
+This is the "bridge" between structured heterogeneous data and standard numerical 
+solvers. It allows computing residuals or norms from mixed-unit data and 
+storing them in a plain, contiguous float array.
 
 # Storage Layout
-The flattened result is stored field-by-field in order. If the HeterogeneousVector has 
-fields `a, b, c` with respective lengths `2, 1, 3`, then:
-- `dest[1:2]` contains results from field `a`
-- `dest[3]` contains results from field `b`
-- `dest[4:6]` contains results from field `c`
+The result is flattened field-by-field according to the order in `Names`. 
+For a vector with fields `pos` (length 2) and `time` (length 1):
+- `dest[1:2]` contains results from `pos`
+- `dest[3]` contains results from `time`
 
 # Examples
 ```jldoctest
-julia> using HeterogeneousArrays
+julia> using HeterogeneousArrays, Unitful
 
-julia> v = HeterogeneousVector(a = [1, 2], b = 3.0);
+julia> v = HeterogeneousVector(pos = [1.0u"m", 2.0u"m"], time = 10.0u"s");
+julia> v_proj = HeterogeneousVector(pos = [1.5u"m", 3.0u"m"], time = 5.0u"s");
 
-julia> result = zeros(3);
+julia> # The ODE solver provides a plain Vector{Float64}
+julia> residuals = Vector{Float64}(undef, length(v));
 
-julia> copyto!(result, Broadcast.broadcasted(+, v, 10));
+julia> # This triggers the flattening copyto!
+julia> residuals .= ustrip.(v .- v_proj);
 
-julia> result
+julia> residuals
 3-element Vector{Float64}:
- 11.0
- 12.0
- 13.0
+ -0.5
+ -1.0
+  5.0
 ```
 """
 @inline Base.@constprop :aggressive function Base.copyto!(

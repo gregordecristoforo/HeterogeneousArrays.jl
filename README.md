@@ -48,6 +48,7 @@ end
 params = (9.81u"m/s^2", 1.0u"m")
 tspan = (0.0u"s", 10.0u"s")
 prob = ODEProblem(pendulum_eom, u0, tspan, params)
+sol = DE.solve(prob, DE.Vern8())
 ```
 
 ### 2. Absolute vs. Relative Errors

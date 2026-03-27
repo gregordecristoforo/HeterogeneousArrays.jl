@@ -1,3 +1,39 @@
+"""
+    Base.BroadcastStyle(::Type{<:AbstractHeterogeneousVector}) -> BroadcastStyle
+
+Define the broadcast style for HeterogeneousVector to enable type-stable broadcasting.
+
+The HeterogeneousVector uses a custom broadcast style to ensure that broadcasting operations
+preserve the heterogeneous structure and field names. When multiple HeterogeneousVectors are 
+involved in a broadcast operation, they must have compatible field names.
+
+# Broadcast Rules
+
+1. **Single HeterogeneousVector with other types**: The broadcast result preserves the 
+   HeterogeneousVector structure and field names.
+
+2. **Multiple HeterogeneousVectors with matching field names**: All vectors must have identical 
+   field names; operations proceed field-by-field in parallel.
+
+3. **Multiple HeterogeneousVectors with different field names**: Throws an error to prevent 
+   silent data corruption.
+
+# Examples
+```jldoctest
+julia> using HeterogeneousArrays
+
+julia> v = HeterogeneousVector(a = [1, 2], b = 3.0);
+
+julia> w = HeterogeneousVector(a = [10, 20], b = 5.0);
+
+julia> result = v .+ w;  # Element-wise addition preserves structure
+
+julia> result.a
+2-element Vector{Int64}:
+ 11
+ 22
+```
+"""
 function Base.BroadcastStyle(::Type{<:AbstractHeterogeneousVector{T, S}}) where {T, S}
     Broadcast.Style{AbstractHeterogeneousVector{fieldnames(S)}}()
 end
@@ -118,6 +154,39 @@ end
 
 # Using the low-level functions Broadcast.broadcasted or Broadcast.Broadcasted incur considerable
 # overhead due to some oddities in the Julia compiler when the arg tuple is not a bitset
+
+"""
+    Base.copy(bc::Broadcast.Broadcasted{Broadcast.Style{AbstractHeterogeneousVector}}) -> HeterogeneousVector
+
+Materialize a broadcast operation into a new HeterogeneousVector.
+
+When a broadcast expression involves a HeterogeneousVector, this method is called to 
+allocate and fill the result. The operation is performed field-by-field, allowing 
+type-stable operations on each segment independently.
+
+# Arguments
+- `bc`: A broadcasted expression tree rooted at a HeterogeneousVector
+
+# Returns
+A new HeterogeneousVector containing the broadcasted results, with all fields computed
+
+# Examples
+```jldoctest
+julia> using HeterogeneousArrays
+
+julia> v = HeterogeneousVector(a = [1, 2], b = 3.0);
+
+julia> result = copy(Broadcast.broadcasted(+, v, 2));
+
+julia> result.a
+2-element Vector{Int64}:
+ 3
+ 4
+
+julia> result.b
+5.0
+```
+"""
 function Base.copy(bc::Broadcast.Broadcasted{Broadcast.Style{AbstractHeterogeneousVector{Names}}}) where {Names}
     function map_fun(::Val{name}) where {name}
         bc_unpacked = unpack_broadcast(bc, Val(name))
@@ -127,6 +196,45 @@ function Base.copy(bc::Broadcast.Broadcasted{Broadcast.Style{AbstractHeterogeneo
     HeterogeneousVector(NamedTuple{Names}(res_args))
 end
 
+"""
+    Base.copyto!(dest::AbstractHeterogeneousVector, bc::Broadcast.Broadcasted) -> AbstractHeterogeneousVector
+
+Materialize a broadcast operation in-place into a HeterogeneousVector.
+
+The broadcast result is computed field-by-field and stored directly into the destination 
+vector's existing storage. For array fields, this uses `Broadcast.materialize!()` for 
+in-place operations. For scalar fields, the result is assigned to the wrapped value.
+
+# Arguments
+- `dest`: The destination HeterogeneousVector (will be modified)
+- `bc`: A broadcasted expression tree
+
+# Returns
+The modified `dest` vector
+
+# Errors
+- Throws `ArgumentError` if the broadcast expression involves a HeterogeneousVector with 
+  different field names than `dest`
+
+# Examples
+```jldoctest
+julia> using HeterogeneousArrays
+
+julia> v = HeterogeneousVector(a = [1.0, 2.0], b = 3.0);
+
+julia> w = HeterogeneousVector(a = [10.0, 20.0], b = 5.0);
+
+julia> copyto!(v, Broadcast.broadcasted(+, v, w));
+
+julia> v.a
+2-element Vector{Float64}:
+ 11.0
+ 22.0
+
+julia> v.b
+8.0
+```
+"""
 @inline Base.@constprop :aggressive function Base.copyto!(
         dest::AbstractHeterogeneousVector{T, S},
         bc::Broadcast.Broadcasted{
@@ -175,6 +283,44 @@ function _compute_segment_ranges(x::NamedTuple)
     return NamedTuple{names}(ranges)
 end
 
+"""
+    Base.copyto!(dest::AbstractArray, bc::Broadcast.Broadcasted{Broadcast.Style{AbstractHeterogeneousVector{Names}}})
+
+Materialize a HeterogeneousVector broadcast result into a flat AbstractArray.
+
+This is the "bridge" between structured heterogeneous data and standard numerical 
+solvers. It allows computing residuals or norms from mixed-unit data and 
+storing them in a plain, contiguous float array.
+
+# Storage Layout
+The result is flattened field-by-field according to the order in `Names`. 
+For a vector with fields `pos` (length 2) and `time` (length 1):
+- `dest[1:2]` contains results from `pos`
+- `dest[3]` contains results from `time`
+
+# Examples
+```jldoctest
+julia> using HeterogeneousArrays, Unitful
+
+julia> v = HeterogeneousVector(pos = [1.0u"m", 2.0u"m"], time = 10.0u"s");
+
+julia> v_proj = HeterogeneousVector(pos = [1.5u"m", 3.0u"m"], time = 5.0u"s");
+
+julia> # The ODE solver provides a plain Vector{Float64}
+
+julia> residuals = Vector{Float64}(undef, length(v));
+
+julia> # This triggers the flattening copyto!
+
+julia> residuals .= ustrip.(v .- v_proj);
+
+julia> residuals
+3-element Vector{Float64}:
+ -0.5
+ -1.0
+  5.0
+```
+"""
 @inline Base.@constprop :aggressive function Base.copyto!(
         dest::AbstractArray,
         bc::Broadcast.Broadcasted{Broadcast.Style{AbstractHeterogeneousVector{Names}}}

@@ -1,3 +1,8 @@
+"""
+    AbstractHeterogeneousVector{T, S} <: AbstractVector{T}
+
+The abstract base type for all heterogeneous vectors.
+"""
 abstract type AbstractHeterogeneousVector{T, S} <: AbstractVector{T} end
 
 # Copy-catted from DiffEqBase DiffEqBaseUnitfulExt.jl
@@ -43,7 +48,17 @@ Named fields:
 ```jldoctest
 julia> using HeterogeneousArrays
 
-julia> v = HeterogeneousVector(x = 1.0, y = 2.5, z = [1, 2, 3])
+julia> v = HeterogeneousVector(x = 1.0, y = 2.5, z = [1, 2, 3]);
+
+julia> v.x
+1.0
+
+julia> v.z
+3-element Vector{Int64}:
+ 1
+ 2
+ 3
+```
 """
 struct HeterogeneousVector{T, S <: NamedTuple} <: AbstractHeterogeneousVector{T, S}
     x::S

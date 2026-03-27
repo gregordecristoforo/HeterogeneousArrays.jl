@@ -13,7 +13,7 @@ The goal of this project is to generalize the prototype from [COMBAT.jl](https:/
 
 ## Installation
 
-Open the Julia package manager (`]`) and run:
+The package can be installed with the Julia package manager. From the Julia REPL type (`]`) and run:
 ```
 pkg> add HeterogeneousArrays
 ```
@@ -74,10 +74,11 @@ One of the primary benefits of using HeterogeneousArrays with Unitful is catchin
 
 HeterogeneousVector is built on a specialized in-place mapping interface. This allows it to communicate with SciML solvers with zero memory overhead, achieving performance parity with plain `Vector{Float64}` while maintaining full type and unit safety.
 
-For detailed benchmarks against ComponentArrays and ArrayPartition, see the Performance Guide.
-Documentation
+For detailed benchmarks against ComponentArrays and ArrayPartition, see the [Performance Guide](https://yaccos.github.io/HeterogeneousArrays.jl/performance/).
 
-## Check out the Full Documentation for:
+## Documentation
+
+Check out the [Full Documentation](https://yaccos.github.io/HeterogeneousArrays.jl/) for:
 
 * API Reference
 * Advanced Broadcasting Logic
@@ -88,9 +89,9 @@ Documentation
 If you use `HeterogeneousArrays.jl` in research, please cite:
 
 ```bibtex
-@software{HeterogeneousArrays2024,
+@software{HeterogeneousArrays2026,
   author = {Jacob Pettersen},
   title = {HeterogeneousArrays.jl: Type-Stable Broadcasting for Heterogeneous State},
-  year = {2024},
-  url = {https://github.com/.../HeterogeneousArrays.jl}
+  year = {2026},
+  url = {https://github.com/yaccos/HeterogeneousArrays.jl}
 }

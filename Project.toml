@@ -11,5 +11,6 @@ RecursiveArrayTools = "731186ca-8d62-57ce-b412-fbd966d074cd"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [compat]
+julia = "1.12"
 RecursiveArrayTools = "3.49.0"
 Unitful = "1.28.0"

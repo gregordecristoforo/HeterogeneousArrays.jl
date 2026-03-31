@@ -81,7 +81,7 @@ the standard Julia tools for structured ODE states: `ArrayPartition` and `Compon
 ### The Benchmark
 We solve a standard 2-body Kepler problem (Orbital Mechanics) using the `Vern8()` solver. 
 This requires thousands of internal broadcast operations and unit conversions.
-The code used for this benchmark is available in the [`benchamrk/` directory](../../benchmark/runbenchmark.jl) of the repository.
+The code used for this benchmark is available in the [`benchamrk/` directory](https://github.com/yaccos/HeterogeneousArrays.jl/tree/main/benchmark/runbenchmark.jl) of the repository.
 
 All benchmark simulation were single-threaded on a CPU:
 ```Julia

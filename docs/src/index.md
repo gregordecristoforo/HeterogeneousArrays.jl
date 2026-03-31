@@ -21,7 +21,7 @@ pkg> add HeterogeneousArrays
 Then use it in your code:
 
 ```julia
-using HeterogeneousArrays, Unitful, DifferentialEquations
+using HeterogeneousArrays
 ```
 
 ## Basic Usage
@@ -79,20 +79,3 @@ sol = solve(prob, Vern8(), abstol = abstol_struct)
 While `HeterogeneousArrays.jl` is designed for SciML integration, it is not compatible with all solvers. It works seamlessly with explicit methods (e.g., `Tsit5()`, `Vern8()`) that rely on broadcasting. 
 However, implicit solvers (e.g., `Rosenbrock23()`) are currently unsupported because they require a homogeneous Jacobian matrix for linear algebra operations. 
 We are actively working on extending compatibility to stiff solvers in future releases.
-
-<!---
-## Citation
-If you use HeterogeneousArrays.jl in research, please cite:
-@article{SpeedyWeatherJOSS,
-  author = {Jacob Pettersen},
-  doi = {},
-  url = {https://doi.org/...},
-  title = {HeterogeneousArrays.jl ... },
-  year = {2026},
-  publisher = {},
-  volume = {},
-  number = {},
-  pages = {},
-  journal = {Journal of Open Source Software}
-}
--->

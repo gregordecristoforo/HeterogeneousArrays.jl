@@ -1,4 +1,7 @@
-using LinearAlgebra, Unitful, BenchmarkTools
+using LinearAlgebra, BenchmarkTools
+import Unitful
+import FlexUnits
+import FlexUnits.UnitRegistry as UnitRegistry
 import ComponentArrays: ComponentVector
 import RecursiveArrayTools: ArrayPartition
 import DifferentialEquations as DE
@@ -22,8 +25,10 @@ end
 # 1. Setup
 r0_raw, v0_raw = [1131.34, -2282.34, 6672.42], [-5.64, 4.30, 2.42]
 μ_raw, Δt_raw = 398600.44, 3600.0
-r0_u, v0_u = r0_raw * u"km", v0_raw * u"km/s"
-μ_u, Δt_u = μ_raw * u"km^3/s^2", Δt_raw * u"s"
+r0_u, v0_u = r0_raw * Unitful.u"km", v0_raw * Unitful.u"km/s"
+μ_u, Δt_u = μ_raw * Unitful.u"km^3/s^2", Δt_raw * Unitful.u"s"
+r0_f, v0_f = r0_raw * UnitRegistry.u"km", v0_raw * UnitRegistry.u"km/s"
+μ_f, Δt_f = μ_raw * UnitRegistry.u"km^3/s^2", Δt_raw * UnitRegistry.u"s"
 
 function f_part!(dy, y, μ, t)
     r_mag = norm(y.x[1])
@@ -42,16 +47,22 @@ common_args = (alg = DE.Vern8(), dt = 1e-3)
 probs = [
     ("1. HeterogeneousVector (No Units)",
         DE.ODEProblem(f_named!, HeterogeneousVector(r = r0_raw, v = v0_raw), (0.0, Δt_raw), μ_raw)),
-    ("2. HeterogeneousVector (Units)",
-        DE.ODEProblem(f_named!, HeterogeneousVector(r = r0_u, v = v0_u), (0.0u"s", Δt_u), μ_u)),
-    ("3. ArrayPartition (No Units)",
+    ("2. HeterogeneousVector (Unitful)",
+        DE.ODEProblem(f_named!, HeterogeneousVector(r = r0_u, v = v0_u), (0.0Unitful.u"s", Δt_u), μ_u)),
+    ("3. HeterogeneousVector (FlexUnits)",
+        DE.ODEProblem(f_named!, HeterogeneousVector(r = r0_f, v = v0_f), (0.0UnitRegistry.u"s", Δt_f), μ_f)),
+    ("4. ArrayPartition (No Units)",
         DE.ODEProblem(f_part!, ArrayPartition(r0_raw, v0_raw), (0.0, Δt_raw), μ_raw)),
-    ("4. ArrayPartition (Units)",
-        DE.ODEProblem(f_part!, ArrayPartition(r0_u, v0_u), (0.0u"s", Δt_u), μ_u)),
+    ("5. ArrayPartition (Unitful)",
+        DE.ODEProblem(f_part!, ArrayPartition(r0_u, v0_u), (0.0Unitful.u"s", Δt_u), μ_u)),
+    ("6. ArrayPartition (FlexUnits)",
+        DE.ODEProblem(f_named!, ArrayPartition(r0_f, v0_f), (0.0UnitRegistry.u"s", Δt_f), μ_f)),
     ("5. ComponentVector (No Units)",
         DE.ODEProblem(f_named!, ComponentVector(r = r0_raw, v = v0_raw), (0.0, Δt_raw), μ_raw)),
-    ("6. ComponentVector (Units)",
-        DE.ODEProblem(f_named!, ComponentVector(r = r0_u, v = v0_u), (0.0u"s", Δt_u), μ_u))
+    ("6. ComponentVector (Unitful)",
+        DE.ODEProblem(f_named!, ComponentVector(r = r0_u, v = v0_u), (0.0Unitful.u"s", Δt_u), μ_u)),
+    ("7. ComponentVector (FlexUnits)",
+        DE.ODEProblem(f_named!, ComponentVector(r = r0_f, v = v0_f), (0.0UnitRegistry.u"s", Δt_f), μ_f)),
 ]
 
 # 2. Execution
@@ -64,6 +75,8 @@ header_mem = lpad("Memory", 15)
 println("\n" * "─" ^ 88)
 println(header_strategy, header_min, header_std, header_allocs, header_mem)
 println("─" ^ 88)
+
+DE.solve(probs[3][2]; dt = 1e-3UnitRegistry.u"s")
 
 for (label, prob) in probs
     # Warmup
@@ -92,3 +105,5 @@ for (label, prob) in probs
         lpad(mem_str, 15))
 end
 println("─" ^ 88)
+
+

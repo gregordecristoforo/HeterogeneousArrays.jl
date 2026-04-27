@@ -5,7 +5,7 @@ import FlexUnits.UnitRegistry as UnitRegistry
 import ComponentArrays: ComponentVector
 import RecursiveArrayTools: ArrayPartition
 import DifferentialEquations as DE
-using StaticArrays: FieldVector
+using StaticArrays: FieldVector, SVector
 using HeterogeneousArrays
 
 # --- Description ---
@@ -28,65 +28,36 @@ r0_raw = [1131.34, -2282.34, 6672.42]
 v0_raw = [-5.64, 4.30, 2.42]
 μ_raw = 398600.44
 Δt_raw = 3600.0
+n_objects = 3
 
-r0_unitful_km = r0_raw * Unitful.u"km"
-v0_unitful_km_per_s = v0_raw * Unitful.u"km/s"
-μ_unitful_km3_per_s2 = μ_raw * Unitful.u"km^3/s^2"
-Δt_unitful_s = Δt_raw * Unitful.u"s"
+r0_unitful = r0_raw * Unitful.u"km"
+v0_unitful = v0_raw * Unitful.u"km/s"
+μ_unitful = μ_raw * Unitful.u"km^3/s^2"
+Δt_unitful = Δt_raw * Unitful.u"s"
 
-r0_flex_km = r0_raw * UnitRegistry.u"km"
-v0_flex_km_per_s = v0_raw * UnitRegistry.u"km/s"
-μ_flex_km3_per_s2 = μ_raw * UnitRegistry.u"km^3/s^2"
-Δt_flex_s = Δt_raw * UnitRegistry.u"s"
+r0_flex = r0_raw * UnitRegistry.u"km"
+v0_flex = v0_raw * UnitRegistry.u"km/s"
+μ_flex = μ_raw * UnitRegistry.u"km^3/s^2"
+Δt_flex = Δt_raw * UnitRegistry.u"s"
 
 tspan_raw = (0.0, Δt_raw)
-tspan_unitful_s = (0.0 * Unitful.u"s", Δt_unitful_s)
-tspan_flex_s = (0.0 * UnitRegistry.u"s", Δt_flex_s)
+tspan_unitful_s = (0.0 * Unitful.u"s", Δt_unitful)
+tspan_flex_s = (0.0 * UnitRegistry.u"s", Δt_flex)
 
-struct OrbitFieldVector{T} <: FieldVector{6, T}
-    r1::T
-    r2::T
-    r3::T
-    v1::T
-    v2::T
-    v3::T
+
+@kwdef struct OrbitFieldVector{T} <: FieldVector{2, SVector{n_objects, T}}
+    r::SVector{n_objects, T}
+    v::SVector{n_objects, T}
 end
 
-gravity_accel(r1, r2, r3, μ) = begin
-    rmag = sqrt(r1^2 + r2^2 + r3^2)
-    factor = -μ / rmag^3
-    return factor * r1, factor * r2, factor * r3
-end
 
 function named_initial_conditions(unit_handling::Symbol)
     if unit_handling === :none
-        return (
-            r0_raw[1], r0_raw[2], r0_raw[3],
-            v0_raw[1], v0_raw[2], v0_raw[3],
-            μ_raw, Δt_raw,
-        )
-    elseif unit_handling === :unitful
-        return (
-            r0_unitful_km[1],
-            r0_unitful_km[2],
-            r0_unitful_km[3],
-            v0_unitful_km_per_s[1],
-            v0_unitful_km_per_s[2],
-            v0_unitful_km_per_s[3],
-            μ_unitful_km3_per_s2,
-            Δt_unitful_s,
-        )
+        return (r0_raw, v0_raw, μ_raw, Δt_raw)
+    elseif unit_handling === :unitful 
+        return (r0_unitful, v0_unitful, μ_unitful, Δt_unitful)
     elseif unit_handling === :flexunits
-        return (
-            r0_flex_km[1],
-            r0_flex_km[2],
-            r0_flex_km[3],
-            v0_flex_km_per_s[1],
-            v0_flex_km_per_s[2],
-            v0_flex_km_per_s[3],
-            μ_flex_km3_per_s2,
-            Δt_flex_s,
-        )
+        return (r0_flex, v0_flex, μ_flex, Δt_flex)
     else
         error("Unknown unit handling: $unit_handling")
     end
@@ -96,77 +67,62 @@ function arraypartition_initial_conditions(unit_handling::Symbol)
     if unit_handling === :none
         return r0_raw, v0_raw, μ_raw, Δt_raw
     elseif unit_handling === :unitful
-        return r0_unitful_km, v0_unitful_km_per_s, μ_unitful_km3_per_s2, Δt_unitful_s
+        return r0_unitful, v0_unitful, μ_unitful, Δt_unitful
     elseif unit_handling === :flexunits
-        return r0_flex_km, v0_flex_km_per_s, μ_flex_km3_per_s2, Δt_flex_s
+        return r0_flex, v0_flex, μ_flex, Δt_flex
     else
         error("Unknown unit handling: $unit_handling")
     end
 end
 
 function f_component_alloc(y, μ, t)
-    a1, a2, a3 = gravity_accel(y.r1, y.r2, y.r3, μ)
-    return ComponentVector(
-        r1 = y.v1,
-        r2 = y.v2,
-        r3 = y.v3,
-        v1 = a1,
-        v2 = a2,
-        v3 = a3,
-    )
+    r_mag = norm(y.r)
+    dr = y.v
+    dv = -μ .* y.r ./ r_mag^3
+    return ComponentVector(r=dr, v=dv)
 end
 
 function f_component_inplace!(dy, y, μ, t)
-    a1, a2, a3 = gravity_accel(y.r1, y.r2, y.r3, μ)
-    dy.r1 = y.v1
-    dy.r2 = y.v2
-    dy.r3 = y.v3
-    dy.v1 = a1
-    dy.v2 = a2
-    dy.v3 = a3
-    return nothing
+    r_mag = norm(y.r)
+    dy.r .= y.v
+    dy.v .= -μ .* y.r ./ r_mag^3
+    dy
 end
 
 function f_arraypartition_alloc(y, μ, t)
-    a = gravity_accel(y.x[1][1], y.x[1][2], y.x[1][3], μ)
-    return ArrayPartition(y.x[2], [a[1], a[2], a[3]])
+    r_mag = norm(y.x[1])
+    dr = y.x[2]
+    dv = -μ .* y.x[1] ./ r_mag^3
+    return ArrayPartition(dr, dv)
 end
 
 function f_arraypartition_inplace!(dy, y, μ, t)
-    a1, a2, a3 = gravity_accel(y.x[1][1], y.x[1][2], y.x[1][3], μ)
+    r_mag = norm(y.x[1])
     dy.x[1] .= y.x[2]
-    dy.x[2][1] = a1
-    dy.x[2][2] = a2
-    dy.x[2][3] = a3
-    return nothing
+    dy.x[2] .= -μ .* y.x[1] ./ r_mag^3
+    dy
 end
 
 function f_heterogeneous_alloc(y, μ, t)
-    a1, a2, a3 = gravity_accel(y.r1, y.r2, y.r3, μ)
-    return HeterogeneousVector(
-        r1 = y.v1,
-        r2 = y.v2,
-        r3 = y.v3,
-        v1 = a1,
-        v2 = a2,
-        v3 = a3,
-    )
+    r_mag = norm(y.r)
+    dr = y.v
+    dv = -μ .* y.r ./ r_mag^3
+    return HeterogeneousVector(r=dr, v=dv)
 end
 
 function f_heterogeneous_inplace!(dy, y, μ, t)
-    a1, a2, a3 = gravity_accel(y.r1, y.r2, y.r3, μ)
-    dy.r1 = y.v1
-    dy.r2 = y.v2
-    dy.r3 = y.v3
-    dy.v1 = a1
-    dy.v2 = a2
-    dy.v3 = a3
-    return nothing
+    r_mag = norm(y.r)
+    dy.r .= y.v
+    dy.v .= -μ .* y.r ./ r_mag^3
+    dy
+    return dy
 end
 
 function f_field_alloc(y, μ, t)
-    a1, a2, a3 = gravity_accel(y.r1, y.r2, y.r3, μ)
-    return OrbitFieldVector(y.v1, y.v2, y.v3, a1, a2, a3)
+    r_mag = norm(y.r)
+    dr = y.v
+    dv = -μ .* y.r ./ r_mag^3
+    return OrbitFieldVector(r=dr, v=dv)
 end
 
 function build_case(array_structure::Symbol, unit_handling::Symbol, ode_interface::Symbol)
@@ -183,17 +139,17 @@ function build_case(array_structure::Symbol, unit_handling::Symbol, ode_interfac
         end
     end
 
-    r1, r2, r3, v1, v2, v3, μ, dt = named_initial_conditions(unit_handling)
+    r, v, μ, dt = named_initial_conditions(unit_handling)
     tspan = unit_handling === :none ? tspan_raw : (unit_handling === :unitful ? tspan_unitful_s : tspan_flex_s)
 
     if array_structure === :componentvector
-        u0 = ComponentVector(r1 = r1, r2 = r2, r3 = r3, v1 = v1, v2 = v2, v3 = v3)
+        u0 = ComponentVector(r = r, v = v)
         f = ode_interface === :allocating ? f_component_alloc : f_component_inplace!
     elseif array_structure === :heterogeneousvector
-        u0 = HeterogeneousVector(r1 = r1, r2 = r2, r3 = r3, v1 = v1, v2 = v2, v3 = v3)
+        u0 = HeterogeneousVector(r = r, v = v)
         f = ode_interface === :allocating ? f_heterogeneous_alloc : f_heterogeneous_inplace!
     elseif array_structure === :fieldvector
-        u0 = OrbitFieldVector(r1, r2, r3, v1, v2, v3)
+        u0 = OrbitFieldVector(r=SVector{n_objects}(r), v = SVector{n_objects}(v))
         if ode_interface !== :allocating
             error("FieldVector only supports the allocating interface")
         end
@@ -259,9 +215,10 @@ println("─" ^ 110)
 
 for case in cases
     try
-        DE.solve(case.prob; alg = DE.Tsit5(), adaptive = false, dt = case.dt)
+        # Warm-up to avoid precompilation from influencing results
+        DE.solve(case.prob; alg = DE.Tsit5(), adaptive = true, dt = case.dt)
 
-        trial = @benchmark DE.solve($(case.prob); alg = DE.Tsit5(), adaptive = false, dt = $(case.dt)) samples=100
+        trial = @benchmark DE.solve($(case.prob); alg = DE.Tsit5(), adaptive = true, dt = $(case.dt)) samples=100
 
         t_min = minimum(trial).time / 1e6
         stderror_ms = (std(trial.times) / sqrt(length(trial.times))) / 1e6
@@ -288,5 +245,3 @@ if !isempty(skipped)
         println("- ", item.array_label, " / ", item.unit_label, " / ", item.interface_label, ": ", item.reason)
     end
 end
-
-

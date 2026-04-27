@@ -1,5 +1,5 @@
 unitful_allocating_case = cases[3]
-sol = DE.solve(unitful_allocating_case.prob; alg = DE.Tsit5(), adaptive = true, dt = unitful_allocating_case.dt)
+sol = DE.solve(unitful_allocating_case.prob; alg = DE.Tsit5(), abstol=ComponentVector(r=1e-5*oneunit.(r0_unitful),v=1e-5*oneunit.(v0_unitful)), adaptive = true, dt = unitful_allocating_case.dt)
 
 skipped = NamedTuple{(:array_label, :unit_label, :interface_label, :reason)}[]
 for case in [unitful_allocating_case]
@@ -25,6 +25,8 @@ for case in [unitful_allocating_case]
         push!(skipped, (array_label = case.array_label, unit_label = case.unit_label, interface_label = case.interface_label, reason = sprint(showerror, err)))
     end
 end
+unitful_allocating_case
+DE.solve(case.prob; alg = DE.Tsit5(), adaptive = false, dt = case.dt)
 
 if !isempty(skipped)
     println("Skipped incompatible combinations:")

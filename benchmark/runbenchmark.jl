@@ -5,6 +5,7 @@ import FlexUnits.UnitRegistry as UnitRegistry
 import ComponentArrays: ComponentVector
 import RecursiveArrayTools: ArrayPartition
 import DifferentialEquations as DE
+import OrdinaryDiffEq as ODE
 using StaticArrays: FieldVector, SVector
 using HeterogeneousArrays
 
@@ -184,7 +185,9 @@ skipped = NamedTuple{(:array_label, :unit_label, :interface_label, :reason)}[]
 for (array_symbol, array_label) in array_structures
     for (unit_symbol, unit_label) in unit_handlings
         for (interface_symbol, interface_label) in ode_interfaces
-            if unit_symbol === :flexunits && interface_symbol === :inplace
+            if array_symbol === :componentvector && unit_symbol === :unitful && interface_symbol === :allocating
+                continue
+            if unit_symbol === :flexunits && array_symbol !== :fieldvector
                 continue
             end
             if array_symbol === :fieldvector && interface_symbol === :inplace

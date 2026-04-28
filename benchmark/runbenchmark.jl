@@ -5,7 +5,6 @@ import FlexUnits.UnitRegistry as UnitRegistry
 import ComponentArrays: ComponentVector
 import RecursiveArrayTools: ArrayPartition
 import DifferentialEquations as DE
-import OrdinaryDiffEq as ODE
 using StaticArrays: FieldVector, SVector
 using HeterogeneousArrays
 
@@ -64,18 +63,6 @@ function named_initial_conditions(unit_handling::Symbol)
     end
 end
 
-function arraypartition_initial_conditions(unit_handling::Symbol)
-    if unit_handling === :none
-        return r0_raw, v0_raw, μ_raw, Δt_raw
-    elseif unit_handling === :unitful
-        return r0_unitful, v0_unitful, μ_unitful, Δt_unitful
-    elseif unit_handling === :flexunits
-        return r0_flex, v0_flex, μ_flex, Δt_flex
-    else
-        error("Unknown unit handling: $unit_handling")
-    end
-end
-
 function f_component_alloc(y, μ, t)
     r_mag = norm(y.r)
     dr = y.v
@@ -127,25 +114,15 @@ function f_field_alloc(y, μ, t)
 end
 
 function build_case(array_structure::Symbol, unit_handling::Symbol, ode_interface::Symbol)
-    if array_structure === :arraypartition
-        r0, v0, μ, dt = arraypartition_initial_conditions(unit_handling)
-        tspan = unit_handling === :none ? tspan_raw : (unit_handling === :unitful ? tspan_unitful_s : tspan_flex_s)
-
-        if ode_interface === :allocating
-            return DE.ODEProblem(f_arraypartition_alloc, ArrayPartition(r0, v0), tspan, μ), dt
-        elseif ode_interface === :inplace
-            return DE.ODEProblem(f_arraypartition_inplace!, ArrayPartition(r0, v0), tspan, μ), dt
-        else
-            error("Unknown ODE interface: $ode_interface")
-        end
-    end
-
     r, v, μ, dt = named_initial_conditions(unit_handling)
     tspan = unit_handling === :none ? tspan_raw : (unit_handling === :unitful ? tspan_unitful_s : tspan_flex_s)
 
     if array_structure === :componentvector
         u0 = ComponentVector(r = r, v = v)
         f = ode_interface === :allocating ? f_component_alloc : f_component_inplace!
+    elseif array_structure === :arraypartition
+        u0 = ArrayPartition(r, v)
+        f = ode_interface === :allocating ? f_arraypartition_alloc : f_arraypartition_inplace!
     elseif array_structure === :heterogeneousvector
         u0 = HeterogeneousVector(r = r, v = v)
         f = ode_interface === :allocating ? f_heterogeneous_alloc : f_heterogeneous_inplace!
@@ -187,6 +164,7 @@ for (array_symbol, array_label) in array_structures
         for (interface_symbol, interface_label) in ode_interfaces
             if array_symbol === :componentvector && unit_symbol === :unitful && interface_symbol === :allocating
                 continue
+            end
             if unit_symbol === :flexunits && array_symbol !== :fieldvector
                 continue
             end

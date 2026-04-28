@@ -1,5 +1,5 @@
 import RecursiveArrayTools
-case = build_case(:fieldvector, :none, :allocating)
+case = build_case(:fieldvector, :unitful, :allocating)
 prob, dt = case
 case = (prob=prob, dt=dt)
 #abstol = Base.similar(prob.u0)

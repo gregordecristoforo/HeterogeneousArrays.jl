@@ -3,6 +3,7 @@ import Unitful
 import FlexUnits
 import FlexUnits.UnitRegistry as UnitRegistry
 import ComponentArrays: ComponentVector
+import RecursiveArrayTools
 import RecursiveArrayTools: ArrayPartition
 import DifferentialEquations as DE
 using StaticArrays: FieldVector, SVector

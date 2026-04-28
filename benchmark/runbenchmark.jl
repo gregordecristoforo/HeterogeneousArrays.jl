@@ -50,6 +50,7 @@ tspan_flex_s = (0.0 * UnitRegistry.u"s", Δt_flex)
     v::SVector{n_objects, T}
 end
 
+RecursiveArrayTools.recursivecopy(u::OrbitFieldVector) = copy(u)
 
 function named_initial_conditions(unit_handling::Symbol)
     if unit_handling === :none

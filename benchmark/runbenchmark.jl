@@ -25,7 +25,7 @@ end
 r0_raw = [1131.34, -2282.34, 6672.42]
 v0_raw = [-5.64, 4.30, 2.42]
 μ_raw = 398600.44
-Δt_raw = 3600.0*100
+Δt_raw = 3600.0*100 # 100 hours
 n_objects = 3
 
 r0_unitful = r0_raw * Unitful.u"km"
@@ -121,12 +121,11 @@ unit_handlings = [
 ]
 
 ode_interfaces = [
-    (:allocating, "allocating"),
-    (:inplace, "non-allocating"),
+    (:allocating, "Allocating"),
+    (:inplace, "Non-allocating"),
 ]
 
 cases = NamedTuple{(:array_label, :unit_label, :interface_label, :prob, :dt)}[]
-skipped = NamedTuple{(:array_label, :unit_label, :interface_label, :reason)}[]
 for (array_symbol, array_label) in array_structures
     for (unit_symbol, unit_label) in unit_handlings
         for (interface_symbol, interface_label) in ode_interfaces
@@ -134,12 +133,8 @@ for (array_symbol, array_label) in array_structures
                 # Incompatible combination which always yields an error because of lack of interface compatibility
                 continue
             end
-            try
-                prob, dt = build_case(array_symbol, unit_symbol, interface_symbol)
-                push!(cases, (array_label = array_label, unit_label = unit_label, interface_label = interface_label, prob = prob, dt = dt))
-            catch err
-                push!(skipped, (array_label = array_label, unit_label = unit_label, interface_label = interface_label, reason = sprint(showerror, err)))
-            end
+            prob, dt = build_case(array_symbol, unit_symbol, interface_symbol)
+            push!(cases, (array_label = array_label, unit_label = unit_label, interface_label = interface_label, prob = prob, dt = dt))
         end
     end
 end
@@ -158,34 +153,23 @@ println(header_array, header_units, header_iface, header_min, header_std, header
 println("─" ^ 110)
 
 for case in cases
-    try
-        # Warm-up to avoid precompilation from influencing results
-        DE.solve(case.prob; alg = DE.Tsit5(), adaptive = true, dt = case.dt)
+    # Warm-up to avoid precompilation from influencing results
+    DE.solve(case.prob; alg = DE.Tsit5(), adaptive = true, dt = case.dt)
 
-        trial = @benchmark DE.solve($(case.prob); alg = DE.Tsit5(), adaptive = true, dt = $(case.dt)) samples=10
+    trial = @benchmark DE.solve($(case.prob); alg = DE.Tsit5(), adaptive = true, dt = $(case.dt)) samples=100
 
-        t_min = minimum(trial).time / 1e6
-        stderror_ms = (std(trial.times) / sqrt(length(trial.times))) / 1e6
-        allocs = trial.allocs
-        memory = trial.memory
-        mem_str = memory < 1024 ? "$(memory) B" : "$(round(memory/1024, digits=1)) KiB"
+    t_min = minimum(trial).time / 1e6
+    stderror_ms = (std(trial.times) / sqrt(length(trial.times))) / 1e6
+    allocs = trial.allocs
+    memory = trial.memory
+    mem_str = memory < 1024 ? "$(memory) B" : "$(round(memory/1024, digits=1)) KiB"
 
-        println(rpad(case.array_label, 22),
-            rpad(case.unit_label, 14),
-            rpad(case.interface_label, 18),
-            lpad(format_val(t_min), 12),
-            lpad(format_val(stderror_ms), 15),
-            lpad(allocs, 12),
-            lpad(mem_str, 15))
-    catch err
-        push!(skipped, (array_label = case.array_label, unit_label = case.unit_label, interface_label = case.interface_label, reason = sprint(showerror, err)))
-    end
+    println(rpad(case.array_label, 22),
+        rpad(case.unit_label, 14),
+        rpad(case.interface_label, 18),
+        lpad(format_val(t_min), 12),
+        lpad(format_val(stderror_ms), 15),
+        lpad(allocs, 12),
+        lpad(mem_str, 15))
 end
 println("─" ^ 110)
-
-if !isempty(skipped)
-    println("Skipped incompatible combinations:")
-    for item in skipped
-        println("- ", item.array_label, " / ", item.unit_label, " / ", item.interface_label, ": ", item.reason)
-    end
-end

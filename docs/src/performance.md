@@ -86,32 +86,39 @@ The code used for this benchmark is available in the [`benchamrk/` directory](ht
 All benchmark simulation were single-threaded on a CPU:
 ```Julia
 julia> versioninfo()
-Julia Version 1.12.5
-Commit 5fe89b8ddc1 (2026-02-09 16:05 UTC)
+Julia Version 1.12.6
+Commit 15346901f0 (2026-04-09 19:20 UTC)
 Build Info:
   Official https://julialang.org release
 Platform Info:
-  OS: Linux (x86_64-linux-gnu)
-  CPU: 20 × 13th Gen Intel(R) Core(TM) i7-13700H
+  OS: Windows (x86_64-w64-mingw32)
+  CPU: 14 × Intel(R) Core(TM) Ultra 7 165U
   WORD_SIZE: 64
   LLVM: libLLVM-18.1.7 (ORCJIT, alderlake)
   GC: Built with stock GC
-Threads: 1 default, 1 interactive, 1 GC (on 20 virtual cores)
+Threads: 1 default, 1 interactive, 1 GC (on 14 virtual cores)
 ```
 
 
-| Implementation Strategy            |   Min (ms)   | StdErr (ms)   |   Allocs   |      Memory   |
-|:-----------------------------------|:-------------|:--------------|:-----------|:--------------|
-|1. HeterogeneousVector (No Units)   |   0.0297     |    0.0015     |     803    |    40.9 KiB   |
-|2. HeterogeneousVector (Units)      |   0.0295     |    0.0028     |     878    |    43.2 KiB   |
-|3. ArrayPartition (No Units)        |   0.0347     |    0.0007     |     851    |    57.3 KiB   |
-|4. ArrayPartition (Units)           |   1.0095     |    0.0328     |     11321  |    676.1 KiB  |
-|5. ComponentVector (No Units)       |   0.0393     |    0.0003     |     1396   |    68.8 KiB   |
-|6. ComponentVector (Units)          |   0.8537     |    0.0186     |     17745  |    359.9 KiB  |
+| Array structure       | Unit handling | ODE interface   | Min (ms) | StdErr (ms) | Allocs | Memory      |
+|:----------------------|:--------------|:----------------|---------:|------------:|-------:|------------:|
+| ComponentVector       | None          | Allocating      | 16.6861  | 1.0606      | 313448 | 12836.1 KiB |
+| ComponentVector       | None          | Non-allocating  | 1.0706   | 0.2697      | 40739  | 1853.8 KiB  |
+| ComponentVector       | Unitful       | Non-allocating  | 21.0436  | 0.8741      | 447033 | 8521.4 KiB  |
+| ArrayPartition        | None          | Allocating      | 1.5601   | 0.5872      | 200734 | 7906.7 KiB  |
+| ArrayPartition        | None          | Non-allocating  | 0.7286   | 0.0211      | 27220  | 1109.7 KiB  |
+| ArrayPartition        | Unitful       | Allocating      | 1.9348   | 0.6848      | 232888 | 9261.4 KiB  |
+| ArrayPartition        | Unitful       | Non-allocating  | 22.5231  | 1.5366      | 268399 | 13754.3 KiB |
+| HeterogeneousVector   | None          | Allocating      | 1.5560   | 0.8799      | 197354 | 7838.0 KiB  |
+| HeterogeneousVector   | None          | Non-allocating  | 1.1747   | 0.0317      | 28425  | 1198.6 KiB  |
+| HeterogeneousVector   | Unitful       | Allocating      | 2.0311   | 1.2939      | 239882 | 9461.4 KiB  |
+| HeterogeneousVector   | Unitful       | Non-allocating  | 0.7000   | 0.0282      | 28453  | 1199.6 KiB  |
+
+
 
 ### Analysis
-- **`HeterogeneousVector`** consistently outperforms `ArrayPartition` in the 'Units'-enabled benchmark.
+- **`HeterogeneousVector`** consistently outperforms `ArrayPartition` in the 'Units'-enabled benchmark for the non-allocating interface and is on par for the allocating interface.
 - **`HeterogeneousVector`** achieves performance parity with `ArrayPartition` for the 'No Units' case while providing descriptive field names (`.r`, `.v`).
 - **Zero-Cost Units:** Thanks to specialized broadcasting kernels, using `Unitful` units results in near-zero performance overhead compared to raw numbers.
-- **Memory Efficiency:** The in-place mapping (via a specialized solver interface) ensures that we don't allocate unnecessary temporary arrays during the integration process. 
+- **Memory Efficiency:** The in-place mapping (via a specialized solver interface) ensures that we don't allocate unnecessary temporary arrays during the integration process. However, the time performance benefit to this approach is modest for `HeterogeneousVector` and `ArrayPartition`.
 - **NB!** `HeterogeneousVector` provides substantial runtime performance benefits, however compilation times are longer. Hence, `ComponentVector` may in practice be faster for one-off simulations which only take a few seconds to run.

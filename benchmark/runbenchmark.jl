@@ -39,7 +39,7 @@ tspan_unitful = (0.0 * Unitful.u"s", Δt_unitful)
 function named_initial_conditions(unit_handling::Symbol)
     if unit_handling === :none
         return (r0_raw, v0_raw, μ_raw, Δt_raw)
-    elseif unit_handling === :unitful 
+    elseif unit_handling === :unitful
         return (r0_unitful, v0_unitful, μ_unitful, Δt_unitful)
     else
         error("Unknown unit handling: $unit_handling")
@@ -50,7 +50,7 @@ function f_component_alloc(y, μ, t)
     r_mag = norm(y.r)
     dr = y.v
     dv = -μ .* y.r ./ r_mag^3
-    return ComponentVector(r=dr, v=dv)
+    return ComponentVector(r = dr, v = dv)
 end
 
 function f_component_inplace!(dy, y, μ, t)
@@ -78,7 +78,7 @@ function f_heterogeneous_alloc(y, μ, t)
     r_mag = norm(y.r)
     dr = y.v
     dv = -μ .* y.r ./ r_mag^3
-    return HeterogeneousVector(r=dr, v=dv)
+    return HeterogeneousVector(r = dr, v = dv)
 end
 
 function f_heterogeneous_inplace!(dy, y, μ, t)
@@ -89,7 +89,6 @@ function f_heterogeneous_inplace!(dy, y, μ, t)
     return dy
 end
 
-
 function build_case(array_structure::Symbol, unit_handling::Symbol, ode_interface::Symbol)
     r, v, μ, dt = named_initial_conditions(unit_handling)
     tspan = unit_handling === :none ? tspan_raw : tspan_unitful
@@ -99,7 +98,8 @@ function build_case(array_structure::Symbol, unit_handling::Symbol, ode_interfac
         f = ode_interface === :allocating ? f_component_alloc : f_component_inplace!
     elseif array_structure === :arraypartition
         u0 = ArrayPartition(r, v)
-        f = ode_interface === :allocating ? f_arraypartition_alloc : f_arraypartition_inplace!
+        f = ode_interface === :allocating ? f_arraypartition_alloc :
+            f_arraypartition_inplace!
     elseif array_structure === :heterogeneousvector
         u0 = HeterogeneousVector(r = r, v = v)
         f = ode_interface === :allocating ? f_heterogeneous_alloc : f_heterogeneous_inplace!
@@ -112,29 +112,32 @@ end
 array_structures = [
     (:componentvector, "ComponentVector"),
     (:arraypartition, "ArrayPartition"),
-    (:heterogeneousvector, "HeterogeneousVector"),
+    (:heterogeneousvector, "HeterogeneousVector")
 ]
 
 unit_handlings = [
     (:none, "None"),
-    (:unitful, "Unitful"),
+    (:unitful, "Unitful")
 ]
 
 ode_interfaces = [
     (:allocating, "Allocating"),
-    (:inplace, "Non-allocating"),
+    (:inplace, "Non-allocating")
 ]
 
 cases = NamedTuple{(:array_label, :unit_label, :interface_label, :prob, :dt)}[]
 for (array_symbol, array_label) in array_structures
     for (unit_symbol, unit_label) in unit_handlings
         for (interface_symbol, interface_label) in ode_interfaces
-            if array_symbol === :componentvector && unit_symbol === :unitful && interface_symbol === :allocating
+            if array_symbol === :componentvector && unit_symbol === :unitful &&
+               interface_symbol === :allocating
                 # Incompatible combination which always yields an error because of lack of interface compatibility
                 continue
             end
             prob, dt = build_case(array_symbol, unit_symbol, interface_symbol)
-            push!(cases, (array_label = array_label, unit_label = unit_label, interface_label = interface_label, prob = prob, dt = dt))
+            push!(cases,
+                (array_label = array_label, unit_label = unit_label,
+                    interface_label = interface_label, prob = prob, dt = dt))
         end
     end
 end
@@ -149,7 +152,8 @@ header_allocs = lpad("Allocs", 12)
 header_mem = lpad("Memory", 15)
 
 println("\n" * "─" ^ 110)
-println(header_array, header_units, header_iface, header_min, header_std, header_allocs, header_mem)
+println(header_array, header_units, header_iface,
+    header_min, header_std, header_allocs, header_mem)
 println("─" ^ 110)
 
 for case in cases

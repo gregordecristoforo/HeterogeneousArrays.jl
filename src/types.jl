@@ -240,3 +240,33 @@ end
 
 @generated Base.propertynames(::AbstractHeterogeneousVector{
     T, S}) where {T, S} = :(fieldnames(S))
+
+# Define isapprox for comparing HeterogeneousVectors
+function Base.isapprox(
+        a::AbstractHeterogeneousVector{T1, S1},
+        b::AbstractHeterogeneousVector{T2, S2};
+        kwargs...
+) where {T1, T2, S1, S2}
+    # Check field names match
+    fieldnames(S1) != fieldnames(S2) && return false
+
+    # Compare each field using isapprox
+    nt_a = NamedTuple(a)
+    nt_b = NamedTuple(b)
+
+    for name in fieldnames(S1)
+        field_a = getproperty(nt_a, name)
+        field_b = getproperty(nt_b, name)
+
+        # Unwrap Ref if present
+        val_a = field_a isa Ref ? field_a[] : field_a
+        val_b = field_b isa Ref ? field_b[] : field_b
+
+        # Use isapprox for comparison
+        if !isapprox(val_a, val_b; kwargs...)
+            return false
+        end
+    end
+
+    return true
+end

@@ -59,22 +59,22 @@ end
 
 @testset "Boundary cases with ordinary arrays" begin
     @testset "Homogeneous array mutated in-place over a heterogeneous broadcast" begin
-       v = HeterogeneousVector(pos = [1.0u"m", 2.0u"m"], time = 10.0u"s")
-       v_projection = HeterogeneousVector(pos = [1.5u"m", 3.0u"m"], time = 5.0u"s")
-       residuals = Vector{Float64}(undef, length(v))
-       residuals .= ustrip.(v .- v_projection)
-       @test residuals ≈ [-0.5, -1.0, 5.0]
+        v = HeterogeneousVector(pos = [1.0u"m", 2.0u"m"], time = 10.0u"s")
+        v_projection = HeterogeneousVector(pos = [1.5u"m", 3.0u"m"], time = 5.0u"s")
+        residuals = Vector{Float64}(undef, length(v))
+        residuals .= ustrip.(v .- v_projection)
+        @test residuals ≈ [-0.5, -1.0, 5.0]
     end
     @testset "Mixed allocating broadcast with both homogeneous and heterogeneous arguments" begin
-        res_broadcasted = [1.0, 2.0, 3.0] .* HeterogeneousVector(length=1.0u"m", mass=1.0u"kg", time=1.0u"s")
-        res_expected = HeterogeneousVector(length=1.0u"m", mass = 2.0u"kg", time = 3.0u"s")
+        res_broadcasted = [1.0, 2.0, 3.0] .*
+                          HeterogeneousVector(length = 1.0u"m", mass = 1.0u"kg", time = 1.0u"s")
+        res_expected = HeterogeneousVector(length = 1.0u"m", mass = 2.0u"kg", time = 3.0u"s")
         @test res_broadcasted ≈ res_expected
     end
 end
 
-
 @testset "Multi-dimensional array broadcast is rejected" begin
-        hv = HeterogeneousVector(a=1.0u"m", b=2.0u"m")
-        mat = reshape([1.0, 2.0], 1, 2)
-        @test_throws ArgumentError mat .* hv
+    hv = HeterogeneousVector(a = 1.0u"m", b = 2.0u"m")
+    mat = reshape([1.0, 2.0], 1, 2)
+    @test_throws ArgumentError mat .* hv
 end

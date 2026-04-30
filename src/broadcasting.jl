@@ -1,3 +1,9 @@
+abstract type AbstractHeterogeneousVectorStyle{Names} <: Broadcast.AbstractArrayStyle{1} end
+
+struct PureHeterogeneousVectorStyle{Names} <: AbstractHeterogeneousVectorStyle{Names} end
+
+struct MixedHeterogeneousVectorStyle{Names} <: AbstractHeterogeneousVectorStyle{Names} end
+
 """
     Base.BroadcastStyle(::Type{<:AbstractHeterogeneousVector}) -> BroadcastStyle
 
@@ -34,12 +40,6 @@ julia> result.a
  22
 ```
 """
-abstract type AbstractHeterogeneousVectorStyle{Names} <: Broadcast.AbstractArrayStyle{1} end
-
-struct PureHeterogeneousVectorStyle{Names} <: AbstractHeterogeneousVectorStyle{Names} end
-
-struct MixedHeterogeneousVectorStyle{Names} <: AbstractHeterogeneousVectorStyle{Names} end
-
 function Base.BroadcastStyle(::Type{<:AbstractHeterogeneousVector{T, S}}) where {T, S}
     PureHeterogeneousVectorStyle{fieldnames(S)}()
 end

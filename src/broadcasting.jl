@@ -370,12 +370,10 @@ end
     function map_fun(::Val{name}) where {name}
         segment_range = segment_ranges[name]
         bc_unpacked = unpack_broadcast(bc, Val(name), segment_range)
-        # dest_segment = view(dest, dest_idx .+ segment_range)
         Broadcast.materialize(bc_unpacked)
     end
     res_args = map(map_fun, Val.(Names))
     HeterogeneousVector(NamedTuple{Names}(res_args))
-    return dest
 end
 
 # Show methods for AbstractHeterogeneousVector

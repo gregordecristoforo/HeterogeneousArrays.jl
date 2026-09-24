@@ -70,6 +70,13 @@ function Base.BroadcastStyle(style::HeterogeneousVectorStyle, ::Broadcast.Defaul
     style
 end
 
+# Tuples are not supported.
+# TODO: If we find some way to partition tuples into segments in a type-stable and
+# allocation-free way (like 1D arrays), we could add support.
+function Base.BroadcastStyle(::HeterogeneousVectorStyle, ::Broadcast.Style{Tuple})
+    throw(ArgumentError("Cannot broadcast AbstractHeterogeneousVector with a Tuple; collect it into a Vector first"))
+end
+
 # N-dimensional default arrays (except 0D and 1D handled above) are not supported.
 function Base.BroadcastStyle(::HeterogeneousVectorStyle,
         ::Broadcast.DefaultArrayStyle{N}) where {N}

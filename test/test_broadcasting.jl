@@ -139,3 +139,10 @@ end
     v = [10.0, 20.0]
     @test_throws ArgumentError (hv .+ v) .* mat
 end
+
+@testset "Tuple broadcast is rejected" begin
+    hv = HeterogeneousVector(a = [1.0, 2.0], b = 3.0)
+    @test_throws ArgumentError hv .+ (1.0,)
+    @test_throws ArgumentError (1.0, 2.0, 3.0) .* hv
+    @test_throws ArgumentError (2.0 .* hv) .+ (1.0, 2.0, 3.0)
+end

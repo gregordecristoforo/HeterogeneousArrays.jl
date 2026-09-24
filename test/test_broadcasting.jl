@@ -65,21 +65,21 @@ end
         residuals .= ustrip.(v .- v_projection)
         @test residuals ≈ [-0.5, -1.0, 5.0]
     end
-    @testset "Mixed allocating broadcast with both homogeneous and heterogeneous arguments" begin
+    @testset "Allocating broadcast with both homogeneous and heterogeneous arguments" begin
         res_broadcasted = [1.0, 2.0, 3.0] .*
                           HeterogeneousVector(length = 1.0u"m", mass = 1.0u"kg", time = 1.0u"s")
         res_expected = HeterogeneousVector(length = 1.0u"m", mass = 2.0u"kg", time = 3.0u"s")
         @test res_broadcasted ≈ res_expected
     end
-    @testset "Nested broadcast trees inside a mixed broadcast" begin
+    @testset "Nested broadcast trees" begin
         hv = HeterogeneousVector(a = [1.0, 2.0], b = 3.0)
         v = [10.0, 20.0, 30.0]
-        # Pure-style subtree (`2.0 .* hv`) nested in a mixed broadcast
+        # Heterogeneous-only subtree (`2.0 .* hv`) nested in a broadcast with an ordinary array
         res = 2.0 .* hv .+ v
         @test res.a ≈ [12.0, 24.0]
         @test res.b ≈ 36.0
         @test res.b isa Float64
-        # Default 1-D array-style subtree (`v .* 2.0`) nested in a mixed broadcast
+        # Default 1-D array-style subtree (`v .* 2.0`) nested in a heterogeneous broadcast
         res = hv .+ (v .* 2.0)
         @test res.a ≈ [21.0, 42.0]
         @test res.b ≈ 63.0
@@ -87,17 +87,8 @@ end
         res = (2.0 .* hv) .- (v .* 2.0) .+ hv
         @test res.a ≈ [-17.0, -34.0]
         @test res.b ≈ -51.0
-        # Nested pure subtree with units
-        hvu = HeterogeneousVector(pos = [1.0u"m", 2.0u"m"], time = 10.0u"s")
-        vu = [1.0, 2.0, 3.0]
-        resu = 2.0 .* hvu .* vu
-        @test resu.pos ≈ [2.0u"m", 8.0u"m"]
-        @test resu.time ≈ 60.0u"s"
-    end
-    @testset "Mixed broadcast combined with default array styles" begin
-        hv = HeterogeneousVector(a = [1.0, 2.0], b = 3.0)
-        v = [10.0, 20.0, 30.0]
-        w = [1.0, 2.0, 3.0]
+        # Subtree with both a heterogeneous vector and an ordinary array (`hv .+ v`),
+        # nested in a broadcast with a scalar or with another ordinary array
         res = (hv .+ v) .* 2.0
         @test res.a ≈ [22.0, 44.0]
         @test res.b ≈ 66.0
@@ -105,14 +96,38 @@ end
         res = 2.0 .* (hv .+ v)
         @test res.a ≈ [22.0, 44.0]
         @test res.b ≈ 66.0
-        res = hv .+ v .+ (2.0 .* 3.0)
-        @test res.a ≈ [17.0, 28.0]
-        @test res.b ≈ 39.0
+        w = [1.0, 2.0, 3.0]
         res = (hv .+ v) .* w
         @test res.a ≈ [11.0, 44.0]
         @test res.b ≈ 99.0
-        array_2d = reshape([1.0, 2.0], 1, 2)
-        @test_throws ArgumentError (hv .+ v) .* array_2d
+        # 0-dimensional subtree (`2.0 .* 3.0`)
+        res = hv .+ v .+ (2.0 .* 3.0)
+        @test res.a ≈ [17.0, 28.0]
+        @test res.b ≈ 39.0
+        # Nested heterogeneous-only subtree with units
+        hvu = HeterogeneousVector(pos = [1.0u"m", 2.0u"m"], time = 10.0u"s")
+        vu = [1.0, 2.0, 3.0]
+        resu = 2.0 .* hvu .* vu
+        @test resu.pos ≈ [2.0u"m", 8.0u"m"]
+        @test resu.time ≈ 60.0u"s"
+    end
+    @testset "Broadcast with scalar-like arguments" begin
+        hv = HeterogeneousVector(a = [1.0, 2.0], b = 3.0)
+        # 0-dimensional array
+        res = hv .+ fill(1.0)
+        @test res.a ≈ [2.0, 3.0]
+        @test res.b ≈ 4.0
+        # Ref
+        res = hv .+ Ref(1.0)
+        @test res.a ≈ [2.0, 3.0]
+        @test res.b ≈ 4.0
+    end
+    @testset "Broadcast with capturing closures" begin
+        hv = HeterogeneousVector(a = [1.0, 2.0], b = 3.0)
+        c = 2.0
+        res = (x -> x * c).(hv)
+        @test res.a ≈ [2.0, 4.0]
+        @test res.b ≈ 6.0
     end
 end
 
@@ -120,4 +135,14 @@ end
     hv = HeterogeneousVector(a = 1.0u"m", b = 2.0u"m")
     mat = reshape([1.0, 2.0], 1, 2)
     @test_throws ArgumentError mat .* hv
+    # Also when the heterogeneous vector sits in a nested subtree mixed with an ordinary array
+    v = [10.0, 20.0]
+    @test_throws ArgumentError (hv .+ v) .* mat
+end
+
+@testset "Tuple broadcast is rejected" begin
+    hv = HeterogeneousVector(a = [1.0, 2.0], b = 3.0)
+    @test_throws ArgumentError hv .+ (1.0,)
+    @test_throws ArgumentError (1.0, 2.0, 3.0) .* hv
+    @test_throws ArgumentError (2.0 .* hv) .+ (1.0, 2.0, 3.0)
 end

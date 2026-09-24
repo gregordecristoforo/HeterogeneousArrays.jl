@@ -22,7 +22,7 @@ end
         f_fused(v1, v2) = @. exp(v1 / 1.0u"m") + v2 / 1.0u"m"
         expected_result_type = typeof(f_fused(x, y))
         @test (@inferred f_fused(x, y)) isa expected_result_type
-        # Mixed broadcast with a scalar field
+        # Broadcast with an ordinary array and a scalar field
         v = [1.0, 2.0, 3.0]
         mul_vec(hv, w) = hv .* w
         @test (@inferred mul_vec(x, v)) isa type_hv
@@ -38,7 +38,7 @@ end
         @test (@inferred get_a_raw(x)) isa ConcreteRefType
     end
 
-    @testset "Zero-Allocation In-Place Updates (Pure Broadcast)" begin
+    @testset "Zero-Allocation In-Place Updates (heterogeneous arguments only)" begin
         dest = zero(x)
         compute_inplace!(dest, x, y)
         b = @benchmarkable compute_inplace!($dest, $x, $y)
@@ -46,7 +46,7 @@ end
         @test res.allocs == 0
     end
 
-    @testset "Zero-Allocation In-Place Updates (Mixed Broadcast)" begin
+    @testset "Zero-Allocation In-Place Updates (with ordinary arrays)" begin
         hv = HeterogeneousVector(a = 1.0, b = [2.0, 3.0])
         v = [1.0, 2.0, 3.0]
         dest = zero(hv)

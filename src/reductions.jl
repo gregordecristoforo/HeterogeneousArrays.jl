@@ -16,12 +16,12 @@ struct _NoValue end
 @inline _combine(op, acc, x) = op(acc, x)
 
 @inline _mapreduce_field(f, op, acc, field::Ref) = _combine(op, acc, f(field[]))
-@inline function _mapreduce_field(f, op, acc, field::AbstractArray)
+@inline function _mapreduce_field(f::F, op::OP, acc, field::AbstractArray) where {F, OP}
     isempty(field) ? acc : _combine(op, acc, mapreduce(f, op, field))
 end
 
 @inline _mapreduce_fields(f, op, acc, ::Tuple{}) = acc
-@inline function _mapreduce_fields(f, op, acc, fields::Tuple)
+@inline function _mapreduce_fields(f::F, op::OP, acc, fields::Tuple) where {F, OP}
     _mapreduce_fields(f, op, _mapreduce_field(f, op, acc, first(fields)), Base.tail(fields))
 end
 
@@ -50,30 +50,38 @@ julia> sum(v)
 6.0
 ```
 """
-function Base.mapreduce(f, op, hv::AbstractHeterogeneousVector; dims = :, kw...)
-    dims === (:) || return _generic_mapreduce(f, op, hv; dims, kw...)
-    acc0 = haskey(kw, :init) ? kw[:init] : _NoValue()
-    acc = _mapreduce_fields(f, op, acc0, _fields(hv))
+# `f`, `op` and `dims` are only passed on, not called, so Julia would not specialize on them
+# (`:` is a `Function` too); the type parameters force specialization, which keeps the
+# reductions type-stable and allocation-free on all supported Julia versions.
+function Base.mapreduce(
+        f::F, op::OP, hv::AbstractHeterogeneousVector;
+        dims::D = :, init = _NoValue()
+) where {F, OP, D}
+    dims === (:) || return _generic_mapreduce(f, op, hv, init; dims)
+    acc = _mapreduce_fields(f, op, init, _fields(hv))
     # Every field is empty: defer to Base for the empty-collection semantics
-    acc isa _NoValue && return _generic_mapreduce(f, op, hv; kw...)
+    acc isa _NoValue && return _generic_mapreduce(f, op, hv, init)
     return acc
 end
 
-function _generic_mapreduce(f, op, hv::AbstractHeterogeneousVector; kw...)
+function _generic_mapreduce(f, op, hv::AbstractHeterogeneousVector, ::_NoValue; kw...)
     invoke(mapreduce, Tuple{Any, Any, AbstractArray}, f, op, hv; kw...)
+end
+function _generic_mapreduce(f, op, hv::AbstractHeterogeneousVector, init; kw...)
+    invoke(mapreduce, Tuple{Any, Any, AbstractArray}, f, op, hv; init, kw...)
 end
 
 _any_field(f, field::Ref) = f(field[])
-_any_field(f, field::AbstractArray) = any(f, field)
+_any_field(f::F, field::AbstractArray) where {F} = any(f, field)
 _all_field(f, field::Ref) = f(field[])
-_all_field(f, field::AbstractArray) = all(f, field)
+_all_field(f::F, field::AbstractArray) where {F} = all(f, field)
 
 @inline _any_fields(f, ::Tuple{}) = false
-@inline _any_fields(f, fields::Tuple) = _any_field(f, first(fields)) ||
-                                        _any_fields(f, Base.tail(fields))
+@inline _any_fields(f::F, fields::Tuple) where {F} = _any_field(f, first(fields)) ||
+                                                     _any_fields(f, Base.tail(fields))
 @inline _all_fields(f, ::Tuple{}) = true
-@inline _all_fields(f, fields::Tuple) = _all_field(f, first(fields)) &&
-                                        _all_fields(f, Base.tail(fields))
+@inline _all_fields(f::F, fields::Tuple) where {F} = _all_field(f, first(fields)) &&
+                                                     _all_fields(f, Base.tail(fields))
 
 """
     Base.any(f, hv::AbstractHeterogeneousVector; dims = :)
@@ -97,12 +105,14 @@ julia> all(isfinite, v)
 false
 ```
 """
-function Base.any(f::Function, hv::AbstractHeterogeneousVector; dims = :)
+function Base.any(f::F, hv::AbstractHeterogeneousVector; dims::D = :) where {
+        F <: Function, D}
     dims === (:) || return invoke(any, Tuple{Function, AbstractArray}, f, hv; dims)
     return _any_fields(f, _fields(hv))
 end
 
-function Base.all(f::Function, hv::AbstractHeterogeneousVector; dims = :)
+function Base.all(f::F, hv::AbstractHeterogeneousVector; dims::D = :) where {
+        F <: Function, D}
     dims === (:) || return invoke(all, Tuple{Function, AbstractArray}, f, hv; dims)
     return _all_fields(f, _fields(hv))
 end

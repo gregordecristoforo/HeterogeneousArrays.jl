@@ -38,7 +38,13 @@
         all_empty = HeterogeneousVector(a = Float64[], b = Float64[])
         @test sum(all_empty) == 0.0
         @test sum(all_empty; init = 1.0) == 1.0
-        @test_throws ArgumentError maximum(all_empty)
+        # Same error as Base for an empty collection (MethodError before Julia 1.11, ArgumentError after)
+        base_error = try
+            maximum(Float64[])
+        catch e
+            typeof(e)
+        end
+        @test_throws base_error maximum(all_empty)
         @test !any(isnan, all_empty)
         @test all(isnan, all_empty)
     end
@@ -76,6 +82,7 @@
 
         @test run(@benchmarkable sum($hv)).allocs == 0
         @test run(@benchmarkable maximum($hv)).allocs == 0
+        @test run(@benchmarkable prod($hv)).allocs == 0
         @test run(@benchmarkable mapreduce(abs2, +, $hv; init = 0.0)).allocs == 0
         @test run(@benchmarkable mapreduce($unitless_abs2, +, $u; init = 0.0)).allocs == 0
         @test run(@benchmarkable any(isnan, $hv)).allocs == 0

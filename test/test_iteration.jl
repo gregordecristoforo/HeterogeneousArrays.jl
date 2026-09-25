@@ -1,6 +1,7 @@
 @testset "Flat Iteration & Indexing" begin
     @testset "Order and empty fields" begin
-        v = HeterogeneousVector(a = Float64[], b = 1.0, c = [2.0, 3.0], d = Float64[], e = 4.0)
+        v = HeterogeneousVector(
+            a = Float64[], b = 1.0, c = [2.0, 3.0], d = Float64[], e = 4.0)
         @test collect(v) == [1.0, 2.0, 3.0, 4.0]
         @test [x for x in v] == [1.0, 2.0, 3.0, 4.0]
         @test [v[i] for i in 1:length(v)] == [1.0, 2.0, 3.0, 4.0]
@@ -65,12 +66,19 @@
     @testset "Type stability & zero allocations" begin
         hv = HeterogeneousVector(A = 1.0, T = 1.0, AT = 1.0, B = rand(101))
         u = HeterogeneousVector(A = 1.0u"m", T = 2.0u"s", B = rand(101))
-        loop_sum(v) = (s = 0.0; for x in v; s += ustrip(x); end; s)
+        loop_sum(v) = (s = 0.0; for x in v
+                s += ustrip(x)
+            end; s)
         generator_sum(v) = sum(ustrip(x) for x in v)
         # Pattern of DiffEqBase's ODE_DEFAULT_NORM for unitful states
-        zip_norm(v, t) = sqrt(sum(((x, _),) -> abs2(ustrip(x)), zip((y for y in v), Iterators.repeated(t))) / length(v))
-        index_sum(v) = (s = 0.0; for i in 1:length(v); s += ustrip(v[i]); end; s)
-        set_all!(v) = (for i in 1:length(v); v[i] = 1.0; end; v)
+        zip_norm(v, t) = sqrt(sum(((x, _),) -> abs2(ustrip(x)), zip((y for y in v), Iterators.repeated(t))) /
+                              length(v))
+        index_sum(v) = (s = 0.0; for i in 1:length(v)
+                s += ustrip(v[i])
+            end; s)
+        set_all!(v) = (for i in 1:length(v)
+                v[i] = 1.0
+            end; v)
 
         # `iterate` returns either `nothing` or a concrete (element, state) tuple
         @test (@inferred Nothing iterate(hv)) isa Tuple{Float64, Tuple{Int, Int}}

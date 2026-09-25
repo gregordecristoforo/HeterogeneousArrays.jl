@@ -50,13 +50,13 @@ julia> sum(v)
 6.0
 ```
 """
-# `f`, `op` and `dims` are only passed on, not called, so Julia would not specialize on them
-# (`:` is a `Function` too); the type parameters force specialization, which keeps the
-# reductions type-stable and allocation-free on all supported Julia versions.
 function Base.mapreduce(
         f::F, op::OP, hv::AbstractHeterogeneousVector;
         dims::D = :, init = _NoValue()
 ) where {F, OP, D}
+    # `f`, `op` and `dims` are only passed on, not called, so Julia would not specialize on
+    # them (`:` is a `Function` too); the type parameters force specialization, which keeps
+    # the reductions type-stable and allocation-free on all supported Julia versions.
     dims === (:) || return _generic_mapreduce(f, op, hv, init; dims)
     acc = _mapreduce_fields(f, op, init, _fields(hv))
     # Every field is empty: defer to Base for the empty-collection semantics

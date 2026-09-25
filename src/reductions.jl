@@ -1,15 +1,13 @@
 # Field-wise reductions
 #
-# The generic AbstractArray reductions fall back to `iterate`, which goes through the
-# type-unstable `Chain` iterator and allocates on every element. Instead, the reductions
-# below recurse over the tuple of fields at compile time, so every field gets a call
-# specialized to its concrete type: a single `f(x[])` for a scalar (`Ref`) field and the
-# ordinary (fast) `mapreduce`/`any`/`all` for an array field.
+# The generic AbstractArray reductions fall back to element-wise iteration, which cannot
+# use the fast array reductions of the fields and yields a union of element types when the
+# fields differ. Instead, the reductions below recurse over the tuple of fields at compile
+# time, so every field gets a call specialized to its concrete type: a single `f(x[])` for a
+# scalar (`Ref`) field and the ordinary (fast) `mapreduce`/`any`/`all` for an array field.
 #
 # Everything built on `mapreduce` (`sum`, `prod`, `maximum`, `minimum`, `extrema`,
 # `count`, ...) benefits as well.
-
-_fields(hv::AbstractHeterogeneousVector) = values(NamedTuple(hv))
 
 # Marks an accumulator that has not received a value yet (no `init` and only empty fields so far)
 struct _NoValue end

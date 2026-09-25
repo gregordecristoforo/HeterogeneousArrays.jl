@@ -6,6 +6,7 @@ using OffsetArrays
 
 @testset "HeterogeneousArrays.jl" begin
     include("test_interface.jl")
+    include("test_iteration.jl")
     include("test_broadcasting.jl")
     include("test_allocation.jl")
     include("test_nesting.jl")

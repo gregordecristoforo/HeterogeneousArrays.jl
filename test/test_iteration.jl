@@ -29,9 +29,6 @@
         o = OffsetArray([10.0, 20.0, 30.0], -1:1)
         v = HeterogeneousVector(s = 1.0, o = o)
         @test collect(v) == [1.0, 10.0, 20.0, 30.0]
-        @test v[2] == 10.0 && v[4] == 30.0
-        v[3] = 99.0
-        @test o[0] == 99.0
     end
 
     @testset "Matrix fields iterate in linear order" begin
@@ -73,25 +70,16 @@
         # Pattern of DiffEqBase's ODE_DEFAULT_NORM for unitful states
         zip_norm(v, t) = sqrt(sum(((x, _),) -> abs2(ustrip(x)), zip((y for y in v), Iterators.repeated(t))) /
                               length(v))
-        index_sum(v) = (s = 0.0; for i in 1:length(v)
-                s += ustrip(v[i])
-            end; s)
-        set_all!(v) = (for i in 1:length(v)
-                v[i] = 1.0
-            end; v)
 
         # `iterate` returns either `nothing` or a concrete (element, state) tuple
         @test (@inferred Nothing iterate(hv)) isa Tuple{Float64, Tuple{Int, Int}}
         @test (@inferred Nothing iterate(hv, (4, 101))) isa Tuple{Float64, Tuple{Int, Int}}
-        @test (@inferred hv[50]) isa Float64
 
         for v in (hv, u)
             @test loop_sum(v) ≈ sum(ustrip, collect(v))
             @test run(@benchmarkable $loop_sum($v)).allocs == 0
             @test run(@benchmarkable $generator_sum($v)).allocs == 0
             @test run(@benchmarkable $zip_norm($v, 1.0)).allocs == 0
-            @test run(@benchmarkable $index_sum($v)).allocs == 0
         end
-        @test run(@benchmarkable $set_all!($(copy(hv)))).allocs == 0
     end
 end

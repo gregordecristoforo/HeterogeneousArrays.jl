@@ -58,8 +58,7 @@
         @test_throws Unitful.DimensionError sum(x for x in v)
     end
 
-    # Regression: iteration used to go through a `Chain` iterator whose state changed type
-    # between fields, boxing the state and the element for every element
+    # Regression: iteration used to allocate for every element
     @testset "Type stability & zero allocations" begin
         hv = HeterogeneousVector(A = 1.0, T = 1.0, AT = 1.0, B = rand(101))
         u = HeterogeneousVector(A = 1.0u"m", T = 2.0u"s", B = rand(101))

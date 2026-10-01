@@ -141,8 +141,7 @@ _fields(hv::AbstractHeterogeneousVector) = values(NamedTuple(hv))
 _field_length(field::Ref) = 1
 _field_length(field::AbstractArray) = length(field)
 
-# Element `j` (1-based, in linear order) of a field; callers guarantee `1 <= j <= _field_length(field)`.
-# Offsetting from `firstindex` also supports arrays with non-standard indices.
+# The `j`-th element of a field in linear order (also for non-standard indices)
 @inline _field_element(field::Ref, j) = field[]
 @inline _field_element(field::AbstractArray, j) = @inbounds field[firstindex(field) + j - 1]
 
@@ -195,16 +194,13 @@ Base.firstindex(hv::AbstractHeterogeneousVector) = 1
 Base.lastindex(hv::AbstractHeterogeneousVector) = length(hv)
 
 # Flat Iteration Support
-#
-# The state `(field_index, element_index)` is always a `Tuple{Int, Int}`, and the fields are
-# visited by compile-time recursion over the tuple of fields, so iteration does not allocate.
-# `k` is the index of the first field in `fields`.
+# The state is `(field index, element index)`; `k` is the index of the first field in `fields`.
 @inline _iterate_fields(::Tuple{}, fi, j, k) = nothing
 @inline function _iterate_fields(fields::Tuple, fi, j, k)
     if fi == k
         field = first(fields)
         j <= _field_length(field) && return _field_element(field, j), (fi, j + 1)
-        fi, j = fi + 1, 1  # field exhausted (or empty): continue with the next one
+        fi, j = fi + 1, 1  # continue with the next field
     end
     return _iterate_fields(Base.tail(fields), fi, j, k + 1)
 end
@@ -226,11 +222,7 @@ elements in sequence.
 - On subsequent calls with state: next `(element, state)` or `nothing` when exhausted
 
 # Performance
-Iteration does not allocate. The element type is concrete when all fields share the same
-element type, and otherwise a union of the field element types (e.g. quantities with
-different units). Small unions are handled efficiently, but with many distinct element types
-the elements have to be boxed; field-wise operations (broadcasting, `sum`, `mapreduce`,
-`any`, `all`) avoid this entirely.
+Iteration does not allocate, but is only type-stable if all fields have the same element type.
 
 # Examples
 ```jldoctest

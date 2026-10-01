@@ -1,15 +1,7 @@
-# Field-wise reductions
-#
-# The generic AbstractArray reductions fall back to element-wise iteration, which cannot
-# use the fast array reductions of the fields and yields a union of element types when the
-# fields differ. Instead, the reductions below recurse over the tuple of fields at compile
-# time, so every field gets a call specialized to its concrete type: a single `f(x[])` for a
-# scalar (`Ref`) field and the ordinary (fast) `mapreduce`/`any`/`all` for an array field.
-#
-# Everything built on `mapreduce` (`sum`, `prod`, `maximum`, `minimum`, `extrema`,
-# `count`, ...) benefits as well.
+# Field-wise reductions: recurse over the fields at compile time instead of iterating
+# element-wise, so each field is reduced with a call specialized to its type.
 
-# Marks an accumulator that has not received a value yet (no `init` and only empty fields so far)
+# Accumulator without a value yet (no `init` and only empty fields so far)
 struct _NoValue end
 
 @inline _combine(op, ::_NoValue, x) = x
@@ -30,12 +22,8 @@ end
 
 Apply `f` to every element of `hv` and reduce the results with `op`.
 
-The reduction is performed field by field: each field is reduced with a call specialized
-to its concrete type, and the per-field results are combined with `op`. This avoids the
-type-unstable element-wise iteration over heterogeneous fields, so reductions such as
-`sum`, `maximum` or `mapreduce(abs2, +, hv)` do not allocate.
-
-If given, `init` is used once as the starting value of the reduction.
+The reduction is performed field by field, so `sum`, `maximum` etc. do not allocate.
+If given, `init` is used once as the starting value.
 
 # Examples
 ```jldoctest
@@ -54,12 +42,10 @@ function Base.mapreduce(
         f::F, op::OP, hv::AbstractHeterogeneousVector;
         dims::D = :, init = _NoValue()
 ) where {F, OP, D}
-    # `f`, `op` and `dims` are only passed on, not called, so Julia would not specialize on
-    # them (`:` is a `Function` too); the type parameters force specialization, which keeps
-    # the reductions type-stable and allocation-free on all supported Julia versions.
+    # The type parameters force specialization on `f`, `op` and `dims`
     dims === (:) || return _generic_mapreduce(f, op, hv, init; dims)
     acc = _mapreduce_fields(f, op, init, _fields(hv))
-    # Every field is empty: defer to Base for the empty-collection semantics
+    # All fields empty: use Base's behavior for empty collections
     acc isa _NoValue && return _generic_mapreduce(f, op, hv, init)
     return acc
 end
@@ -89,8 +75,7 @@ _all_field(f::F, field::AbstractArray) where {F} = all(f, field)
 
 Test whether `f` returns `true` for any (all) elements of `hv`.
 
-The test is performed field by field with calls specialized to each field's concrete
-type and short-circuits, so it does not allocate. `f` must return a `Bool`.
+The test is performed field by field and does not allocate. `f` must return a `Bool`.
 
 # Examples
 ```jldoctest

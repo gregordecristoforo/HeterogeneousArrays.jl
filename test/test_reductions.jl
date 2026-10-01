@@ -38,7 +38,7 @@
         all_empty = HeterogeneousVector(a = Float64[], b = Float64[])
         @test sum(all_empty) == 0.0
         @test sum(all_empty; init = 1.0) == 1.0
-        # Same error as Base for an empty collection (MethodError before Julia 1.11, ArgumentError after)
+        # Same error as Base for empty collections
         base_error = try
             maximum(Float64[])
         catch e
@@ -66,8 +66,7 @@
         @test all(<(0), x; dims = 1) == [false]
     end
 
-    # Regression: reductions used to iterate element-wise over the type-unstable `Chain`
-    # iterator, allocating several times per element (e.g. in ODE solver norms and NaN checks)
+    # Regression: reductions used to allocate for every element
     @testset "Type stability & zero allocations" begin
         hv = HeterogeneousVector(A = 1.0, T = 1.0, AT = 1.0, B = rand(101))
         u = HeterogeneousVector(A = 1.0u"m", T = 2.0u"s", B = rand(101))

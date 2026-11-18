@@ -3,7 +3,6 @@ using Unitful
 using LSODA: lsoda
 import DifferentialEquations as DE
 
-
 u0 = CollectionVector(A = 1.0u"mol/L", B = 0.0u"mol/L", C = 0.0u"mol/L")
 p = (k1 = 0.04u"s^-1", k2 = 1.0e4u"L/(mol*s)", k3 = 1.08e11u"L/(mol*hr)")
 

@@ -1,4 +1,5 @@
 using DifferentialEquations
+using LSODA: lsoda
 using ADTypes: AutoFiniteDiff
 using SciMLBase: SciMLBase, ReturnCode
 
@@ -31,6 +32,26 @@ end
         @test isapprox(sol.u[end].N, N_exact(1u"hr"); rtol)
         # Conservation: E = e * (N0 - N)
         @test isapprox(sol.u[end].E, p.e * (u0.N - sol.u[end].N); rtol)
+    end
+
+    # LSODA.jl overloads `__solve` directly and calls a C library, so this checks that the
+    # wrapper works with solvers outside OrdinaryDiffEq. LSODA does not report `stats`.
+    @testset "external __solve (LSODA)" begin
+        sol = solve(prob, cv_wrapper(lsoda()); abstol = tol, reltol = 1e-8,
+            saveat = 0u"minute":10u"minute":60u"minute")
+        @test sol.retcode == ReturnCode.Success
+        @test sol.u[end] isa CollectionVector
+        @test sol.t ≈ (0:600:3600)u"s"
+        @test isapprox(sol.u[end].N, N_exact(1u"hr"); rtol = 1e-5)
+        @test isapprox(sol.u[end].E, p.e * (u0.N - sol.u[end].N); rtol = 1e-5)
+        # out-of-place, tspan in hours
+        prob_oop = ODEProblem(decay, u0, (0.0u"hr", 1.0u"hr"), p)
+        sol = solve(prob_oop, cv_wrapper(lsoda()); abstol = tol, reltol = 1e-8)
+        @test sol.t[end] == 1.0u"hr"
+        @test isapprox(sol.u[end].N, N_exact(1u"hr"); rtol = 1e-5)
+        # LSODA's own interpolation is coarse: check that `sol(t)` matches it with units
+        @test sol(30u"minute").N ≈ sol.raw(0.5)[1] * u"mol"
+        @test isapprox(sol(30u"minute").N, N_exact(30u"minute"); rtol = 1e-2)
     end
 
     @testset "default algorithm" begin

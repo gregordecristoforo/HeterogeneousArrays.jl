@@ -12,6 +12,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 HeterogeneousArrays = "40d36c5c-e028-4551-8108-c37812a952b9"
 OffsetArrays = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
+LSODA = "7f56f5a3-f504-529b-bc02-0b1fe5e64312"
 
 [sources]
 HeterogeneousArrays = {path = ".."}

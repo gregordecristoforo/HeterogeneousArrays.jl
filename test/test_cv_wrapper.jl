@@ -108,6 +108,18 @@ end
         prob_strict = ODEProblem(decay_strict, u0, (0.0u"s", 1.0u"hr"), p)
         sol = solve(prob_strict, cv_wrapper(Rodas5P()); abstol = tol, reltol = 1e-8)
         @test isapprox(sol.u[end].N, N_exact(1u"hr"); rtol = 1e-5)
+        # moody RHS: the derivative in per-second and per-hour units, alternating by minute
+        function decay_moody(u, p, t)
+            dN, dE = -p.k * u.N, p.k * u.N * p.e
+            per_hr = isodd(floor(Int, ustrip(u"minute", t)))
+            CollectionVector(N = per_hr ? uconvert(u"mol/hr", dN) : dN,
+                E = per_hr ? uconvert(u"J/hr", dE) : dE)
+        end
+        sol = solve(ODEProblem(decay_moody, u0, (0.0u"s", 1.0u"hr"), p),
+            cv_wrapper(Rodas5P()); abstol = tol, reltol = 1e-8)
+        @test eltype(sol.u) <: CollectionVector
+        @test isconcretetype(eltype(sol.u))
+        @test isapprox(sol.u[end].N, N_exact(1u"hr"); rtol = 1e-5)
     end
 
     @testset "abstol" begin

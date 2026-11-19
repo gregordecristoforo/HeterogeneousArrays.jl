@@ -150,7 +150,7 @@ end
         SU = HeterogeneousArrays.shapeof(u0)
         tu = u"s"
         rhs = Ext.RawRHS{true, SU, Ext.derivative_shape(SU, tu), typeof(decay!), typeof(tu)}(
-            decay!, tu)
+            decay!)
         u = copy(HeterogeneousArrays.rawdata(u0))
         du = similar(u)
         rhs(du, u, p, 1.0)

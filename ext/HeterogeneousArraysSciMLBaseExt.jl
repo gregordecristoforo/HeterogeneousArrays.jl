@@ -61,25 +61,24 @@ strip_time(tu, ::Nothing, name) = nothing
 
 ## The ODE function on raw storage
 #
-# Callable struct with the shapes as type parameters, so `attach` is resolved at compile
-# time: wrapping the solver's arrays costs nothing and allocates nothing. This also works
-# when the arrays hold ForwardDiff.Dual numbers, so autodiff Jacobians work.
+# Callable struct with the shapes and the time unit as type parameters, so `attach` is
+# resolved at compile time: wrapping the solver's arrays costs nothing and allocates
+# nothing, and this also works for ForwardDiff.Dual arrays (autodiff Jacobians)
 
 struct RawRHS{IIP, SU, SD, F, TU} <: Function
     f::F    # the user's ODE function
-    tu::TU  # time unit, to give `t` its unit back
 end
 
 # In-place: the user writes into a unitful view of the solver's `du`. Compatible units are
 # converted on assignment, a wrong dimension throws a DimensionError.
-function (r::RawRHS{true, SU, SD})(du, u, p, t) where {SU, SD}
-    r.f(attach(SD, du), attach(SU, u), p, t * r.tu)
+function (r::RawRHS{true, SU, SD, F, TU})(du, u, p, t) where {SU, SD, F, TU}
+    r.f(attach(SD, du), attach(SU, u), p, t * TU())
     return nothing
 end
 # Out-of-place: copy the returned CollectionVector into the units of SD.
-function (r::RawRHS{false, SU, SD})(u, p, t) where {SU, SD}
+function (r::RawRHS{false, SU, SD, F, TU})(u, p, t) where {SU, SD, F, TU}
     du = attach(SD, similar(u))
-    copyto!(du, r.f(attach(SU, u), p, t * r.tu))
+    copyto!(du, r.f(attach(SU, u), p, t * TU()))
     return rawdata(du)
 end
 
@@ -125,7 +124,7 @@ function SciMLBase.__solve(prob::SciMLBase.AbstractODEProblem, w::CVWrapper, arg
     iip = SciMLBase.isinplace(prob)
     # Same problem on the raw storage. `p` is passed unchanged (the user's function gets
     # it as-is), and the specialization of the user's ODEFunction is kept.
-    rhs = RawRHS{iip, SU, derivative_shape(SU, tu), typeof(prob.f.f), typeof(tu)}(prob.f.f, tu)
+    rhs = RawRHS{iip, SU, derivative_shape(SU, tu), typeof(prob.f.f), typeof(tu)}(prob.f.f)
     f = SciMLBase.ODEFunction{iip, SciMLBase.specialization(prob.f)}(rhs)
     tspan = strip_time(tu, prob.tspan, :tspan)
     rawprob = SciMLBase.ODEProblem{iip}(f, copy(rawdata(prob.u0)), tspan, prob.p)

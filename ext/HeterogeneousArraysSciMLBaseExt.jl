@@ -139,7 +139,7 @@ function SciMLBase.__solve(prob::SciMLBase.AbstractODEProblem, w::CVWrapper, arg
     rawkw = raw_kwargs(SU, rawprob.u0, tu; kwargs...)
     algs = w.alg === nothing ? () : (w.alg,)
     rawsol = SciMLBase.solve(rawprob, algs..., args...; rawkw...)
-    return CVSolution(rawsol, SU, tu)
+    return SciMLBase.build_solution(rawsol, w, SU, tu)
 end
 
 # The integrator interface (`init`, `step!`, ...) is not supported: it would need an
@@ -166,6 +166,9 @@ function CVSolution(raw, SU, tu)
     t = raw.t .* tu
     return CVSolution{SU, typeof(raw), typeof(tu), typeof(u), typeof(t)}(raw, tu, u, t)
 end
+
+SciMLBase.build_solution(sol::SciMLBase.AbstractODESolution, ::CVWrapper, SU, tu) =
+    CVSolution(sol, SU, tu)
 
 function Base.getproperty(sol::CVSolution, name::Symbol)
     name in fieldnames(CVSolution) ? getfield(sol, name) :

@@ -103,6 +103,11 @@ end
         prob_oop = ODEProblem(decay, u0, (0.0u"s", 1.0u"hr"), p)
         sol = solve(prob_oop, cv_wrapper(Rodas5P()); abstol = tol, reltol = 1e-8)
         @test isapprox(sol.u[end].N, N_exact(1u"hr"); rtol = 1e-5)
+        # derivative in exactly the du units: passes through instead of copying
+        decay_strict(u, p, t) = CollectionVector(N = -p.k * u.N, E = p.k * u.N * p.e)
+        prob_strict = ODEProblem(decay_strict, u0, (0.0u"s", 1.0u"hr"), p)
+        sol = solve(prob_strict, cv_wrapper(Rodas5P()); abstol = tol, reltol = 1e-8)
+        @test isapprox(sol.u[end].N, N_exact(1u"hr"); rtol = 1e-5)
     end
 
     @testset "abstol" begin
@@ -160,5 +165,12 @@ end
         dud = similar(ud)
         rhs(dud, ud, p, 1.0)
         @test (@allocated rhs(dud, ud, p, 1.0)) == 0
+        # out-of-place pass-through: with the du shape and units already exact, f's own
+        # storage goes to the solver without a copy
+        ret = CollectionVector(N = 1.0u"mol/s", E = 2.0u"J/s")
+        fstrict = (u, p, t) -> ret
+        rhs_oop = Ext.RawRHS{false, SU, Ext.derivative_shape(SU, tu),
+            typeof(fstrict), typeof(tu)}(fstrict)
+        @test rhs_oop(u, p, 1.0) === HeterogeneousArrays.rawdata(ret)
     end
 end

@@ -75,11 +75,18 @@ function (r::RawRHS{true, SU, SD, F, TU})(du, u, p, t) where {SU, SD, F, TU}
     r.f(attach(SD, du), attach(SU, u), p, t * TU())
     return nothing
 end
-# Out-of-place: copy the returned CollectionVector into the units of SD.
+# Out-of-place: pass through f's own storage when it already has the shape and units of SD;
+# otherwise copy into SD, which converts units and checks the fields. Pass-through is what a
+# plain out-of-place function already promises (fresh vector per call, solver owns it).
 function (r::RawRHS{false, SU, SD, F, TU})(u, p, t) where {SU, SD, F, TU}
-    du = attach(SD, similar(u))
-    copyto!(du, r.f(attach(SU, u), p, t * TU()))
-    return rawdata(du)
+    du = r.f(attach(SU, u), p, t * TU())
+    data = rawdata(du)
+    if shapeof(du) == SD && typeof(data) === typeof(u)
+        return data  # f's own storage is already what the solver expects
+    end
+    out = attach(SD, similar(u))
+    copyto!(out, du)
+    return rawdata(out)
 end
 
 ## Translating the problem and the keyword arguments

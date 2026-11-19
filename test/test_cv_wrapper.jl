@@ -122,6 +122,20 @@ end
         @test isapprox(sol.u[end].N, N_exact(1u"hr"); rtol = 1e-5)
     end
 
+    @testset "derivative shape type stability" begin
+        Ext = Base.get_extension(HeterogeneousArrays, :HeterogeneousArraysSciMLBaseExt)
+        SU = HeterogeneousArrays.shapeof(u0)
+        tu = u"s"
+        # The unit of each slot depends on the *value* of `n` (as `tu^n`), so `n` must
+        # arrive through a `Val`: with a runtime `Int` — or one captured as a closure
+        # field, which is how the first version called `dunit` — the slots infer as `Any`.
+        rt = only(Base.code_typed(Ext.derivative_shape, (typeof(SU), typeof(tu), Val{1})))[2]
+        @test !occursin("Any", string(rt))       # every slot's type statically known
+        @test occursin("FreeUnits", string(rt))  # and not just `Nothing` fallbacks
+        rt_int = only(Base.code_typed(Ext.derivative_shape, (typeof(SU), typeof(tu), Int)))[2]
+        @test occursin("Any", string(rt_int))    # honest: runtime `n` cannot be inferred
+    end
+
     @testset "abstol" begin
         ref = solve(prob, cv_wrapper(Tsit5()); abstol = tol).u[end]
         # same tolerance as a CollectionVector in other units

@@ -40,9 +40,12 @@ SciMLBase.isadaptive(w::CVWrapper) = w.alg === nothing || SciMLBase.isadaptive(w
 time_unit(t::Unitful.AbstractQuantity) = unit(t)
 time_unit(::Real) = NoUnits
 
-# Shape of the n-th time derivative of u: same slots, each unit divided by tu^n.
-# A dimensionless result is stored as a plain number (`nothing`), as in the constructor.
-derivative_shape(SU, tu, n = 1) = map(((slot, ft),) -> (slot, dunit(ft, tu^n)), SU)
+# Shape of the n-th time derivative of u: same slots, each unit divided by tu^n. The type
+# of `tu^n` depends on the value of `n`, so `n` enters through a `Val` and the whole map
+# is computed at compile time. A dimensionless result is stored as a plain number
+# (`nothing`), as in the constructor.
+derivative_shape(SU, tu, n = 1) = derivative_shape(SU, tu, Val(n))
+derivative_shape(SU, tu, ::Val{n}) where {n} = map(((slot, ft),) -> (slot, dunit(ft, tu^n)), SU)
 dunit(ft::Unitful.Units, d) = plain(ft / d)
 dunit(::Nothing, d) = plain(inv(d))
 plain(u) = u == NoUnits ? nothing : u
@@ -180,7 +183,7 @@ end
 function (sol::CVSolution{SU})(t, ::Type{Val{n}} = Val{0}) where {SU, n}
     t isa AbstractVector && return [sol(ti, Val{n}) for ti in t]
     x = sol.raw(strip_time(sol.tu, t, :t), Val{n})
-    return attach(derivative_shape(SU, sol.tu, n), x)
+    return attach(derivative_shape(SU, sol.tu, Val(n)), x)
 end
 
 end # module

@@ -121,7 +121,7 @@ function SciMLBase.__solve(prob::SciMLBase.AbstractODEProblem, w::CVWrapper, arg
     prob.u0 isa CollectionVector || throw(ArgumentError(
         "cv_wrapper needs a CollectionVector as u0, got a $(typeof(prob.u0))"))
     SU = shapeof(prob.u0)
-    tu = time_unit(prob.tspan[1])
+    tu = time_unit(first(prob.tspan))
     iip = SciMLBase.isinplace(prob)
     # Same problem on the raw storage. `p` is passed unchanged (the user's function gets
     # it as-is), and the specialization of the user's ODEFunction is kept.

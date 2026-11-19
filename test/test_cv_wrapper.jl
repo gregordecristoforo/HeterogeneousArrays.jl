@@ -26,8 +26,9 @@ end
         Rosenbrock23(autodiff = AutoFiniteDiff()), ImplicitEuler())
         sol = solve(prob, cv_wrapper(alg); abstol = tol, reltol = 1e-8)
         @test sol.retcode == ReturnCode.Success
-        @test sol.u[end] isa CollectionVector
-        @test sol.t[end] == 3600.0u"s"
+        @test eltype(sol.u) <: CollectionVector
+        @test isconcretetype(eltype(sol.u))
+        @test sol.t[end] ≈ 3600.0u"s"
         rtol = alg isa ImplicitEuler ? 1e-2 : 1e-5
         @test isapprox(sol.u[end].N, N_exact(1u"hr"); rtol)
         # Conservation: E = e * (N0 - N)
@@ -40,17 +41,18 @@ end
         sol = solve(prob, cv_wrapper(lsoda()); abstol = tol, reltol = 1e-8,
             saveat = 0u"minute":10u"minute":60u"minute")
         @test sol.retcode == ReturnCode.Success
-        @test sol.u[end] isa CollectionVector
+        @test eltype(sol.u) <: CollectionVector
+        @test isconcretetype(eltype(sol.u))
         @test sol.t ≈ (0:600:3600)u"s"
         @test isapprox(sol.u[end].N, N_exact(1u"hr"); rtol = 1e-5)
         @test isapprox(sol.u[end].E, p.e * (u0.N - sol.u[end].N); rtol = 1e-5)
         # out-of-place, tspan in hours
         prob_oop = ODEProblem(decay, u0, (0.0u"hr", 1.0u"hr"), p)
         sol = solve(prob_oop, cv_wrapper(lsoda()); abstol = tol, reltol = 1e-8)
-        @test sol.t[end] == 1.0u"hr"
+        @test sol.t[end] ≈ 1.0u"hr"
         @test isapprox(sol.u[end].N, N_exact(1u"hr"); rtol = 1e-5)
         # LSODA's own interpolation is coarse: check that `sol(t)` matches it with units
-        @test sol(30u"minute").N ≈ sol.raw(0.5)[1] * u"mol"
+        @test sol(30u"minute").N ≈ first(sol.raw(0.5)) * u"mol"
         @test isapprox(sol(30u"minute").N, N_exact(30u"minute"); rtol = 1e-2)
     end
 
@@ -64,7 +66,7 @@ end
             saveat = 0u"minute":10u"minute":60u"minute")
         @test sol.t ≈ (0:600:3600)u"s"
         @test length(sol.u) == 7
-        @test sol.u[1] == u0
+        @test first(sol.u) == u0
         @test sol.stats.naccept > 0  # forwarded to the raw solution
         # interpolation with a unitful time, and its derivative
         sol = solve(prob, cv_wrapper(Tsit5()); abstol = tol, reltol = 1e-10)
@@ -107,7 +109,7 @@ end
         ref = solve(prob, cv_wrapper(Tsit5()); abstol = tol).u[end]
         # same tolerance as a CollectionVector in other units
         cvtol = CollectionVector(N = 1.0e-7u"mmol", E = 1.0e-8u"kJ")
-        @test solve(prob, cv_wrapper(Tsit5()); abstol = cvtol).u[end] == ref
+        @test solve(prob, cv_wrapper(Tsit5()); abstol = cvtol).u[end] ≈ ref
         # array field
         prob_arr = ODEProblem(
             (du, u, p, t) -> (du.x .= -u.x ./ u"s"; du.y = -u.y / u"s"; nothing),

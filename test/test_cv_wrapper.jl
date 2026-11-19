@@ -154,8 +154,7 @@ end
         Ext = Base.get_extension(HeterogeneousArrays, :HeterogeneousArraysSciMLBaseExt)
         SU = HeterogeneousArrays.shapeof(u0)
         tu = u"s"
-        rhs = Ext.RawRHS{true, SU, Ext.derivative_shape(SU, tu), typeof(decay!), typeof(tu)}(
-            decay!)
+        rhs = Ext.RawRHS{true, SU, Ext.derivative_shape(SU, tu), typeof(decay!), tu}(decay!)
         u = copy(HeterogeneousArrays.rawdata(u0))
         du = similar(u)
         rhs(du, u, p, 1.0)
@@ -169,8 +168,8 @@ end
         # storage goes to the solver without a copy
         ret = CollectionVector(N = 1.0u"mol/s", E = 2.0u"J/s")
         fstrict = (u, p, t) -> ret
-        rhs_oop = Ext.RawRHS{false, SU, Ext.derivative_shape(SU, tu),
-            typeof(fstrict), typeof(tu)}(fstrict)
+        rhs_oop = Ext.RawRHS{false, SU, Ext.derivative_shape(SU, tu), typeof(fstrict), tu}(
+            fstrict)
         @test rhs_oop(u, p, 1.0) === HeterogeneousArrays.rawdata(ret)
     end
 end

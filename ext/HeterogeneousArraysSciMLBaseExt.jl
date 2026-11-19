@@ -72,14 +72,14 @@ end
 # In-place: the user writes into a unitful view of the solver's `du`. Compatible units are
 # converted on assignment, a wrong dimension throws a DimensionError.
 function (r::RawRHS{true, SU, SD, F, TU})(du, u, p, t) where {SU, SD, F, TU}
-    r.f(attach(SD, du), attach(SU, u), p, t * TU())
+    r.f(attach(SD, du), attach(SU, u), p, t * TU)
     return nothing
 end
 # Out-of-place: pass through f's own storage when it already has the shape and units of SD;
 # otherwise copy into SD, which converts units and checks the fields. Pass-through is what a
 # plain out-of-place function already promises (fresh vector per call, solver owns it).
 function (r::RawRHS{false, SU, SD, F, TU})(u, p, t) where {SU, SD, F, TU}
-    du = r.f(attach(SU, u), p, t * TU())
+    du = r.f(attach(SU, u), p, t * TU)
     data = rawdata(du)
     if shapeof(du) == SD && typeof(data) === typeof(u)
         return data  # f's own storage is already what the solver expects
@@ -131,7 +131,7 @@ function SciMLBase.__solve(prob::SciMLBase.AbstractODEProblem, w::CVWrapper, arg
     iip = SciMLBase.isinplace(prob)
     # Same problem on the raw storage. `p` is passed unchanged (the user's function gets
     # it as-is), and the specialization of the user's ODEFunction is kept.
-    rhs = RawRHS{iip, SU, derivative_shape(SU, tu), typeof(prob.f.f), typeof(tu)}(prob.f.f)
+    rhs = RawRHS{iip, SU, derivative_shape(SU, tu), typeof(prob.f.f), tu}(prob.f.f)
     f = SciMLBase.ODEFunction{iip, SciMLBase.specialization(prob.f)}(rhs)
     tspan = strip_time(tu, prob.tspan, :tspan)
     rawprob = SciMLBase.ODEProblem{iip}(f, copy(rawdata(prob.u0)), tspan, prob.p)

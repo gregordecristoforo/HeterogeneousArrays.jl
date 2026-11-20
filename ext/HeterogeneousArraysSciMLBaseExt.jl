@@ -140,8 +140,7 @@ function SciMLBase.__solve(prob::SciMLBase.AbstractODEProblem, w::CVWrapper, arg
     rawprob = SciMLBase.ODEProblem{iip}(f, copy(rawdata(prob.u0)), tspan, prob.p)
 
     rawkw = raw_kwargs(SU, rawprob.u0, tu; kwargs...)
-    algs = w.alg === nothing ? () : (w.alg,)
-    rawsol = SciMLBase.solve(rawprob, algs..., args...; rawkw...)
+    rawsol = SciMLBase.__solve(rawprob, w.alg, args...; rawkw...)
     return SciMLBase.build_solution(rawsol, w, SU, tu)
 end
 

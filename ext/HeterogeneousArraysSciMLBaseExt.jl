@@ -9,7 +9,8 @@ module HeterogeneousArraysSciMLBaseExt
 #      the user's function,
 #   2. solve that plain-Vector problem with the wrapped algorithm (so Jacobian-based solvers
 #      work),
-#   3. return the solution with the units attached again (`CVSolution`).
+#   3. return the solution with the units attached again: an `ODESolution` on the user's
+#      problem, interpolated through `CVInterpolation`.
 #
 # Notation: SU = shape of u (`shapeof(u0)`: field names, storage slots and units),
 # SD = shape of du (units of u divided by the time unit), tu = time unit.
@@ -141,7 +142,7 @@ function SciMLBase.__solve(prob::SciMLBase.AbstractODEProblem, w::CVWrapper, arg
 
     rawkw = raw_kwargs(SU, rawprob.u0, tu; kwargs...)
     rawsol = SciMLBase.__solve(rawprob, w.alg, args...; rawkw...)
-    return SciMLBase.build_solution(rawsol, w, SU, tu)
+    return SciMLBase.build_solution(rawsol, w, prob, SU, tu)
 end
 
 # The integrator interface (`init`, `step!`, ...) is not supported: it would need an
@@ -154,35 +155,40 @@ end
 
 ## The solution with units
 #
-# `sol.u` are CollectionVector views over the raw saved states (no copies), `sol.t` has
-# units, and every other property (retcode, stats, ...) comes from the raw solution `sol.raw`.
+# A regular `ODESolution` on the user's problem, built like OrdinaryDiffEq builds its own.
+# `sol.u` are views over the raw states, `sol.original` is the raw solution, and `sol.k` is
+# `nothing` (stage units depend on the solver). `CVInterpolation` handles the units in `sol(t)`.
 
-struct CVSolution{SU, R, TU, UV, TV}
-    raw::R
-    tu::TU
-    u::UV
-    t::TV
+struct CVInterpolation{SU, TU, R} <: SciMLBase.AbstractDiffEqInterpolation
+    raw::R  # the raw solution
 end
-function CVSolution(raw, SU, tu)
-    u = [attach(SU, x) for x in raw.u]
-    t = raw.t .* tu
-    return CVSolution{SU, typeof(raw), typeof(tu), typeof(u), typeof(t)}(raw, tu, u, t)
+CVInterpolation(raw, SU, tu) = CVInterpolation{SU, tu, typeof(raw)}(raw)
+
+SciMLBase.interp_summary(ci::CVInterpolation) = SciMLBase.interp_summary(ci.raw.interp)
+
+# `sol(t, Val{n}; idxs)` lands here: u(t), or its n-th derivative in units of u / tu^n.
+# `idxs` (an index or a vector of indices) picks elements of that state.
+function (ci::CVInterpolation{SU, TU})(t::Number, idxs, ::Type{Val{n}}, p,
+        continuity) where {SU, TU, n}
+    x = ci.raw(strip_time(TU, t, :t), Val{n}; continuity)
+    u = attach(derivative_shape(SU, TU, Val(n)), x)
+    return idxs === nothing ? u : u[idxs]
+end
+function (ci::CVInterpolation)(t::AbstractVector{<:Number}, idxs, deriv, p, continuity)
+    return SciMLBase.DiffEqArray([ci(ti, idxs, deriv, p, continuity) for ti in t], t)
+end
+function (ci::CVInterpolation)(v, t, idxs, deriv, p, continuity)
+    throw(ArgumentError("cv_wrapper: in-place interpolation `sol(v, t)` is not supported"))
 end
 
-SciMLBase.build_solution(sol::SciMLBase.AbstractODESolution, ::CVWrapper, SU, tu) =
-    CVSolution(sol, SU, tu)
-
-function Base.getproperty(sol::CVSolution, name::Symbol)
-    name in fieldnames(CVSolution) ? getfield(sol, name) :
-    getproperty(getfield(sol, :raw), name)
-end
-
-# Interpolation with a unitful time (or a vector of times): `sol(t)` gives u(t),
-# `sol(t, Val{n})` the n-th derivative, in units of u / tu^n.
-function (sol::CVSolution{SU})(t, ::Type{Val{n}} = Val{0}) where {SU, n}
-    t isa AbstractVector && return [sol(ti, Val{n}) for ti in t]
-    x = sol.raw(strip_time(sol.tu, t, :t), Val{n})
-    return attach(derivative_shape(SU, sol.tu, Val(n)), x)
+function SciMLBase.build_solution(rawsol::SciMLBase.AbstractODESolution, w::CVWrapper,
+        prob::SciMLBase.AbstractODEProblem, SU, tu)
+    u = [attach(SU, x) for x in rawsol.u]
+    t = rawsol.t .* tu
+    return SciMLBase.build_solution(prob, w, t, u;
+        interp = CVInterpolation(rawsol, SU, tu), dense = rawsol.dense,
+        alg_choice = rawsol.alg_choice, calculate_error = false, stats = rawsol.stats,
+        retcode = rawsol.retcode, original = rawsol)
 end
 
 end # module

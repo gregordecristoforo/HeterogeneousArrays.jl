@@ -47,10 +47,8 @@ Rosenbrock, BDF, ...) work, including with ForwardDiff.
 - Only `solve` is supported: the integrator interface (`init`, `step!`, ...) throws an error.
 
 # Solution
-The returned solution holds `sol.u` (a `Vector` of `CollectionVector`s viewing the raw
-solution) and `sol.t` (with units). It can be interpolated with a unitful time, `sol(t)`, or
-`sol(t, Val{1})` for the derivative. Other properties (`retcode`, `stats`, ...) come from the
-raw solution, which is available as `sol.raw`.
+A regular `ODESolution` with units: `sol.u` holds `CollectionVector`s, `sol.t` and `sol(t)`
+take units. The raw solution is `sol.original`; `sol.k` is `nothing`.
 
 !!! note
     Requires SciMLBase to be loaded (e.g. through `using OrdinaryDiffEq`).

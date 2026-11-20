@@ -52,7 +52,7 @@ end
         @test sol.t[end] ≈ 1.0u"hr"
         @test isapprox(sol.u[end].N, N_exact(1u"hr"); rtol = 1e-5)
         # LSODA's own interpolation is coarse: check that `sol(t)` matches it with units
-        @test sol(30u"minute").N ≈ first(sol.raw(0.5)) * u"mol"
+        @test sol(30u"minute").N ≈ first(sol.original(0.5)) * u"mol"
         @test isapprox(sol(30u"minute").N, N_exact(30u"minute"); rtol = 1e-2)
     end
 
@@ -67,7 +67,20 @@ end
         @test sol.t ≈ (0:600:3600)u"s"
         @test length(sol.u) == 7
         @test first(sol.u) == u0
-        @test sol.stats.naccept > 0  # forwarded to the raw solution
+        @test sol.stats.naccept > 0  # taken over from the raw solution
+        # a regular ODESolution on the user's problem, so SciMLBase's interface works
+        @test sol isa SciMLBase.ODESolution
+        @test sol.prob === prob
+        @test sol.original isa SciMLBase.ODESolution
+        @test sol.original.u[end] == HeterogeneousArrays.rawdata(sol.u[end])
+        @test SciMLBase.successful_retcode(sol)
+        @test sol[end] == sol.u[end] && length(sol) == 7
+        @test size(Array(sol)) == (2, 7)
+        @test [u for (u, t) in SciMLBase.tuples(sol)] == sol.u
+        # compact printing: the raw solution and its type are not shown
+        str = sprint(show, MIME"text/plain"(), sol)
+        @test startswith(str, "retcode: Success")
+        @test !occursin("ODEProblem", str)
         # interpolation with a unitful time, and its derivative
         sol = solve(prob, cv_wrapper(Tsit5()); abstol = tol, reltol = 1e-10)
         x = sol(30u"minute")
@@ -79,6 +92,12 @@ end
         xs = sol([10u"minute", 20u"minute"])
         @test length(xs) == 2 && xs[2] isa CollectionVector
         @test_throws ArgumentError sol(1.0u"m")
+        # single elements with idxs, as for an unwrapped solution
+        @test sol(30u"minute"; idxs = 1) == x.N
+        @test sol(30u"minute"; idxs = [1, 2]) == [x.N, x.E]
+        @test sol(30u"minute", Val{1}; idxs = 1) == dx.N
+        @test sol([10u"minute", 30u"minute"]; idxs = 1).u[2] == x.N
+        @test_throws ArgumentError sol(similar(u0), 30u"minute")
     end
 
     @testset "time units" begin
